@@ -1,0 +1,4719 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>像素坦克大战</title>
+<style>
+  :root{
+    --bg:#0d0d12;
+    --panel:#17171f;
+    --panel2:#1e1e29;
+    --line:#2c2c3a;
+    --txt:#e8e6dd;
+    --dim:#8b8b96;
+    --yellow:#ffc93c;
+    --red:#e84545;
+    --green:#58b94a;
+    --btn:#2a2a38;
+    --btn-hi:#353548;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; user-select:none; -webkit-user-select:none; }
+  html,body{ height:100%; }
+  body{
+    background:var(--bg);
+    color:var(--txt);
+    font-family:"Press Start 2P","Courier New",ui-monospace,monospace;
+    display:flex; align-items:center; justify-content:center;
+    min-height:100vh; padding:16px;
+    overflow-x:hidden;
+  }
+  body::before{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image:repeating-linear-gradient(0deg, rgba(255,255,255,.022) 0 1px, transparent 1px 4px);
+  }
+  #app{ position:relative; z-index:1; width:100%; max-width:1100px; }
+
+  /* ============ 通用屏幕 ============ */
+  .screen{ display:none; }
+  .screen.active{ display:flex; }
+  .hidden{ display:none !important; }
+
+  .pixel-btn{
+    font-family:inherit; font-size:17px; color:var(--txt);
+    background:var(--btn); border:2px solid #3c3c50;
+    padding:14px 26px; cursor:pointer; letter-spacing:2px;
+    box-shadow:0 4px 0 #000, inset 0 -4px 0 rgba(0,0,0,.35), inset 0 2px 0 rgba(255,255,255,.08);
+    image-rendering:pixelated; transition:transform .06s, box-shadow .06s, background .15s;
+  }
+  .pixel-btn:hover{ background:var(--btn-hi); border-color:#56566e; }
+  .pixel-btn:active{ transform:translateY(3px); box-shadow:0 1px 0 #000; }
+  .pixel-btn.primary{ background:#3c6e33; border-color:#58b94a; color:#fff; }
+  .pixel-btn.primary:hover{ background:#4a8540; }
+  .pixel-btn.accent{ background:#8a5a17; border-color:#ffc93c; color:#fff; }
+  .pixel-btn.accent:hover{ background:#a56d1d; }
+  .pixel-btn.small{ font-size:11px; padding:8px 12px; box-shadow:0 3px 0 #000; }
+  .pixel-btn.danger{ background:#7a2f2f; border-color:#e84545; color:#fff; }
+
+  /* ============ 标题屏幕 ============ */
+  #screen-title{
+    flex-direction:column; align-items:center; gap:26px;
+    padding:30px 10px;
+  }
+  .title-logo{ text-align:center; }
+  .title-logo .pix-tank{ display:block; margin:0 auto 6px; image-rendering:pixelated; }
+  .title-logo h1{
+    font-size:56px; color:var(--yellow); letter-spacing:14px; text-indent:14px;
+    font-weight:900;
+    text-shadow:3px 0 0 #7a2f2f, 0 3px 0 #7a2f2f, -3px 0 0 #7a2f2f, 0 -3px 0 #7a2f2f,
+                6px 6px 0 #3d1313, 3px 3px 0 #3d1313;
+    font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+    line-height:1.1;
+  }
+  .title-logo .sub{
+    margin-top:14px; font-size:11px; color:var(--dim); letter-spacing:6px;
+  }
+  .title-logo .ver{
+    margin-top:10px; font-size:12px; color:var(--green); letter-spacing:4px;
+    border:1px solid #2c2c3a; background:#10101a; display:inline-block; padding:5px 14px;
+  }
+  .title-menu{ display:flex; flex-direction:column; gap:16px; width:280px; }
+  .title-menu .pixel-btn{ font-size:17px; padding:18px; }
+  .title-menu .pixel-btn.disabled{ opacity:.35; pointer-events:none; filter:grayscale(1); }
+  .title-demo{ image-rendering:pixelated; border:2px solid var(--line); background:#0b0b10; }
+
+  /* ============ 新游戏配置 ============ */
+  #newGameOverlay{
+    position:fixed; inset:0; z-index:60; background:rgba(8,8,12,.82);
+    display:flex; align-items:center; justify-content:center; padding:16px;
+  }
+  .ng-panel{
+    width:100%; max-width:680px; background:var(--panel); border:2px solid var(--line);
+    box-shadow:0 8px 0 #000; padding:24px; display:flex; flex-direction:column; gap:18px;
+    max-height:92vh; overflow-y:auto;
+  }
+  .ng-panel .card-title{ font-size:26px; }
+  .ng-panel .card-sub{ font-size:14px; }
+  .ng-group{ display:flex; flex-direction:column; gap:10px; }
+  .ng-group .label{ font-size:15px; color:var(--dim); letter-spacing:2px; display:flex; align-items:center; gap:8px; }
+  .ng-group .label .tag{
+    background:#3a3a4a; color:var(--yellow); padding:3px 10px; font-size:12px; border:1px solid #4a4a5e;
+  }
+  .ng-panel .tank-preview{ justify-content:center; }
+  .ng-panel .tank-desc{ max-width:520px; }
+
+  /* ============ 设置：音量 / 振动 ============ */
+  .vol-slider{
+    -webkit-appearance:none; appearance:none; width:100%; height:10px; background:#23232f;
+    border:2px solid #3c3c50; outline:none;
+  }
+  .vol-slider::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none; width:18px; height:22px; background:var(--yellow);
+    border:2px solid #000; cursor:pointer; box-shadow:0 2px 0 #000;
+  }
+  .vol-slider::-moz-range-thumb{
+    width:14px; height:18px; background:var(--yellow); border:2px solid #000; cursor:pointer;
+  }
+  .vol-val{ font-size:13px; color:var(--dim); letter-spacing:2px; }
+  .opt-btn.toggle-on{ background:#3c6e33; border-color:var(--green); color:#fff; }
+  .opt-btn.toggle-on .sub{ color:#c9f2c0; }
+
+  /* ============ 设置屏幕 ============ */
+  #screen-settings{
+    flex-direction:column; align-items:center; gap:20px; padding:20px 10px 30px;
+  }
+  .settings-panel{
+    width:100%; max-width:760px; background:var(--panel);
+    border:2px solid var(--line); box-shadow:0 6px 0 #000;
+    padding:24px; display:flex; flex-direction:column; gap:24px;
+    max-height:calc(100vh - 70px); overflow-y:auto;
+  }
+  .settings-panel::-webkit-scrollbar{ width:10px; }
+  .settings-panel::-webkit-scrollbar-thumb{ background:#3c3c50; border-radius:5px; }
+  .settings-panel h2{
+    font-size:20px; color:var(--yellow); letter-spacing:6px; text-align:center;
+    font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+    text-shadow:0 2px 0 #3d1313;
+  }
+  .set-group{ display:flex; flex-direction:column; gap:10px; }
+  .set-group .label{
+    font-size:15px; color:var(--dim); letter-spacing:2px; display:flex; align-items:center; gap:8px;
+  }
+  .set-group .label .tag{
+    background:#3a3a4a; color:var(--yellow); padding:3px 10px; font-size:12px; border:1px solid #4a4a5e;
+  }
+  .option-row{ display:flex; gap:10px; flex-wrap:wrap; }
+  .opt-btn{
+    font-family:inherit; font-size:15px; color:var(--txt); background:var(--btn);
+    border:2px solid #3c3c50; padding:12px 20px; cursor:pointer; letter-spacing:1px;
+    box-shadow:0 3px 0 #000; transition:background .12s, border-color .12s;
+  }
+  .opt-btn:hover{ background:var(--btn-hi); }
+  .opt-btn.on{ background:#8a5a17; border-color:var(--yellow); color:#fff; }
+  .opt-btn .sub{ display:block; font-size:11px; color:var(--dim); margin-top:5px; letter-spacing:0; }
+  .opt-btn.on .sub{ color:#ffe9b0; }
+  .tank-preview{ display:flex; align-items:center; gap:14px; }
+  .tank-preview canvas{ image-rendering:pixelated; background:#0b0b10; border:2px solid var(--line); }
+  .tank-desc{ font-size:14px; color:var(--txt); line-height:1.9; letter-spacing:1px;
+    font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif; }
+  .tank-desc b{ color:var(--yellow); }
+  .key-row{
+    display:flex; align-items:center; gap:10px; padding:6px 0;
+    border-bottom:1px dashed #26262f;
+  }
+  .key-row .kname{ width:120px; font-size:14px; color:var(--txt); letter-spacing:2px; }
+  .key-row .kbtn{
+    font-family:inherit; font-size:14px; color:var(--yellow); background:#23232f;
+    border:2px solid #3c3c50; padding:8px 18px; cursor:pointer; min-width:90px; text-align:center;
+  }
+  .key-row .kbtn.listening{ background:#7a2f2f; border-color:var(--red); color:#fff; animation:blink .5s steps(2) infinite; }
+  @keyframes blink{ 50%{ opacity:.45; } }
+  .key-row .khint{ font-size:12px; color:var(--dim); }
+
+  /* ============ 游戏屏幕 ============ */
+  #screen-game{ justify-content:center; }
+  .game-wrap{ display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; justify-content:center; }
+  .canvas-frame{
+    position:relative; border:3px solid #3c3c50; box-shadow:0 8px 0 #000, 0 0 0 2px #111 inset;
+    background:#0b0b10; line-height:0;
+  }
+  #gameCanvas{ width:608px; max-width:100%; height:auto; display:block; image-rendering:pixelated; }
+  #overlay{
+    position:absolute; inset:0; background:rgba(8,8,12,.78);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px;
+    line-height:1.4;
+  }
+  #overlay .msg{ font-size:32px; color:var(--yellow); letter-spacing:4px; text-align:center;
+    font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif; font-weight:900;
+    text-shadow:2px 2px 0 #3d1313; }
+  #overlay .msg.sub{ font-size:16px; color:var(--txt); letter-spacing:2px; font-weight:normal; }
+  #overlay .msg.red{ color:var(--red); }
+  #overlay .pixel-btn{ min-width:190px; }
+
+  .hud{
+    width:270px; background:var(--panel); border:2px solid var(--line); box-shadow:0 6px 0 #000;
+    padding:16px; display:flex; flex-direction:column; gap:10px;
+  }
+  .hud .hud-title{ font-size:18px; color:var(--yellow); letter-spacing:3px; text-align:center;
+    font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif; font-weight:900; }
+  .hud .hud-ver{ font-size:10px; color:var(--dim); text-align:center; letter-spacing:3px; }
+  .streak-box{
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+    padding:10px 0; background:#10101a; border:2px solid #2c2c3a;
+  }
+  .streak-box .streak-label{ font-size:13px; color:var(--dim); letter-spacing:6px; text-indent:6px; }
+  .streak-box .streak-num{
+    font-size:44px; color:var(--yellow); font-weight:900; line-height:1;
+    text-shadow:3px 3px 0 #3d1313;
+    font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+  }
+  .streak-box .streak-sub{ font-size:12px; color:var(--green); letter-spacing:2px; }
+  .streak-box .streak-sub.lives{ color:var(--yellow); margin-top:2px; }
+  .hud .row{ display:flex; justify-content:space-between; align-items:center; font-size:14px; letter-spacing:1px; }
+  .hud .row .k{ color:var(--dim); }
+  .hud .row .v{ color:var(--txt); }
+  .hud .row .v.hot{ color:var(--yellow); }
+  .hud .row .v.ready{ color:var(--green); }
+  .hud .row .v.cool{ color:var(--dim); }
+  .hud .sep{ height:1px; background:var(--line); }
+  .hud .enemy-icons{ display:flex; gap:4px; flex-wrap:wrap; }
+  .hud .enemy-icons i{ width:12px; height:12px; display:inline-block; border:1px solid #000; image-rendering:pixelated; }
+  .armor-pips{ display:flex; gap:8px; align-items:center; }
+  .pip{ display:inline-block; width:12px; height:12px; border:1px solid #000; }
+  .pip.on{ background:var(--green); }
+  .pip.off{ background:#33333f; }
+  .hud .legend{ display:flex; flex-wrap:wrap; gap:6px 10px; font-size:9px; color:var(--dim); letter-spacing:1px; }
+  .hud .legend i{ width:10px; height:10px; display:inline-block; border:1px solid #000; vertical-align:-1px; margin-right:3px; }
+  .hud .keys-tip{ font-size:9px; color:var(--dim); line-height:1.9; letter-spacing:0; }
+  .hud .keys-tip b{ color:var(--yellow); }
+  .hud-btns{ display:flex; flex-direction:column; gap:8px; }
+
+  /* ============ 卡牌选择覆盖层 ============ */
+  #cardOverlay, #bossOverlay, #bossCardOverlay{
+    position:fixed; inset:0; z-index:50; background:rgba(6,6,10,.86);
+    display:flex; align-items:center; justify-content:center; padding:16px;
+  }
+  #bossCardOverlay{ z-index:55; }
+  #bossCardOverlay .card-box{ max-height:calc(100vh - 30px); overflow-y:auto; }
+  #bossCardOverlay .card-box::-webkit-scrollbar{ width:10px; }
+  #bossCardOverlay .card-box::-webkit-scrollbar-thumb{ background:#3c3c50; border-radius:5px; }
+  #bossCardOverlay .card{ width:225px; }
+  .card.picked{ border-color:var(--green); box-shadow:0 6px 0 #1e3a18; background:#20281c; }
+  .card.picked .pick{ color:var(--green); }
+  .card.disabled{ opacity:.4; pointer-events:none; }
+  .card-box{
+    width:100%; max-width:860px; text-align:center;
+    display:flex; flex-direction:column; gap:18px;
+  }
+  .card-title{
+    font-size:34px; color:var(--yellow); letter-spacing:6px; font-weight:900;
+    font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+    text-shadow:3px 3px 0 #3d1313;
+  }
+  .card-sub{ font-size:14px; color:var(--dim); letter-spacing:2px; }
+  .cards{ display:flex; gap:16px; justify-content:center; flex-wrap:wrap; }
+  .card{
+    width:250px; background:var(--panel); border:3px solid #3c3c50;
+    padding:16px 14px; cursor:pointer; text-align:left;
+    box-shadow:0 6px 0 #000; transition:transform .08s, border-color .12s;
+    display:flex; flex-direction:column; gap:8px;
+  }
+  .card:hover{ border-color:var(--yellow); transform:translateY(-3px); }
+  .card .card-desc{ font-size:12px; color:var(--dim); letter-spacing:.5px; }
+  .card canvas{ image-rendering:pixelated; align-self:center; }
+  .card h3{ font-size:17px; color:var(--yellow); letter-spacing:3px;
+    font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif; text-align:center; }
+  .card .lvl{ font-size:11px; color:var(--dim); text-align:center; margin-top:-4px; }
+  .card p{ font-size:14px; color:var(--txt); line-height:1.8; letter-spacing:.5px;
+    font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif; }
+  .card .pick{ font-size:12px; color:var(--green); text-align:center; margin-top:4px; letter-spacing:2px; }
+
+  @media (max-width:940px){
+    .title-logo h1{ font-size:40px; letter-spacing:8px; text-indent:8px; }
+    .hud{ width:100%; flex-direction:row; flex-wrap:wrap; align-items:center; gap:10px; }
+    .hud .hud-title{ width:100%; }
+    .hud-btns{ flex-direction:row; }
+    #gameCanvas{ width:100%; height:auto; }
+    .card{ width:200px; }
+  }
+  @media (max-width:480px){
+    .title-logo h1{ font-size:30px; letter-spacing:4px; text-indent:4px; }
+    .settings-panel{ padding:14px; }
+    .pixel-btn{ padding:10px 14px; font-size:13px; }
+    .card{ width:100%; max-width:250px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== 视图：标题 ===== -->
+  <div id="screen-title" class="screen active">
+    <div class="title-logo">
+      <canvas id="titleDemo" class="pix-tank" width="192" height="192"></canvas>
+      <h1>坦克大战</h1>
+      <div class="sub">PIXEL TANK BATTLE · 19×19</div>
+      <div class="ver">V0.20</div>
+    </div>
+    <div class="title-menu">
+      <button class="pixel-btn primary" id="btnStart">新游戏</button>
+      <button class="pixel-btn accent" id="btnContinue">继续游戏</button>
+      <button class="pixel-btn accent" id="btnBoss">BOSS 战</button>
+      <button class="pixel-btn accent" id="btnSettings">设　置</button>
+    </div>
+  </div>
+
+  <!-- ===== 视图：设置 ===== -->
+  <div id="screen-settings" class="screen">
+    <div class="settings-panel">
+      <h2>设 置</h2>
+
+      <div class="set-group">
+        <div class="label"><span class="tag">1</span> 音效音量</div>
+        <input type="range" class="vol-slider" id="sfxVol" min="0" max="100" step="1" value="100">
+        <div class="vol-val" id="sfxVolVal">100</div>
+      </div>
+
+      <div class="set-group">
+        <div class="label"><span class="tag">2</span> 音乐音量</div>
+        <input type="range" class="vol-slider" id="bgmVol" min="0" max="100" step="1" value="100">
+        <div class="vol-val" id="bgmVolVal">100</div>
+      </div>
+
+      <div class="set-group">
+        <div class="label"><span class="tag">3</span> 振动反馈（受击/爆炸时振动，需设备支持）</div>
+        <div class="option-row">
+          <button class="opt-btn toggle-on" id="vibBtn">振动：开</button>
+        </div>
+      </div>
+
+      <div class="set-group">
+        <div class="label"><span class="tag">4</span> 按键设置（点击后按下新键，支持键盘与鼠标，Esc 取消）</div>
+        <div class="key-row"><span class="kname">向上</span><button class="kbtn" data-key="up">W</button><span class="khint">默认 W</span></div>
+        <div class="key-row"><span class="kname">向下</span><button class="kbtn" data-key="down">S</button><span class="khint">默认 S</span></div>
+        <div class="key-row"><span class="kname">向左</span><button class="kbtn" data-key="left">A</button><span class="khint">默认 A</span></div>
+        <div class="key-row"><span class="kname">向右</span><button class="kbtn" data-key="right">D</button><span class="khint">默认 D</span></div>
+        <div class="key-row"><span class="kname">开火</span><button class="kbtn" data-key="fire">空格</button><span class="khint">默认 空格</span></div>
+        <div class="key-row"><span class="kname">坦克技能</span><button class="kbtn" data-key="skill">V</button><span class="khint">默认 V</span></div>
+        <div class="key-row"><span class="kname">部署炸弹</span><button class="kbtn" data-key="bomb">B</button><span class="khint">默认 B</span></div>
+      </div>
+
+      <div class="set-group">
+        <div class="label"><span class="tag">5</span> P2 按键设置（双人 · 默认方向键移动 + 小键盘）</div>
+        <div class="key-row"><span class="kname">向上</span><button class="kbtn" data-key="up2">↑</button><span class="khint">默认 ↑</span></div>
+        <div class="key-row"><span class="kname">向下</span><button class="kbtn" data-key="down2">↓</button><span class="khint">默认 ↓</span></div>
+        <div class="key-row"><span class="kname">向左</span><button class="kbtn" data-key="left2">←</button><span class="khint">默认 ←</span></div>
+        <div class="key-row"><span class="kname">向右</span><button class="kbtn" data-key="right2">→</button><span class="khint">默认 →</span></div>
+        <div class="key-row"><span class="kname">开火</span><button class="kbtn" data-key="fire2">小键盘0</button><span class="khint">默认 小键盘0</span></div>
+        <div class="key-row"><span class="kname">坦克技能</span><button class="kbtn" data-key="skill2">小键盘回车</button><span class="khint">默认 小键盘回车</span></div>
+        <div class="key-row"><span class="kname">部署炸弹</span><button class="kbtn" data-key="bomb2">小键盘.</button><span class="khint">默认 小键盘.</span></div>
+      </div>
+
+      <div style="display:flex; justify-content:center; gap:12px; margin-top:4px;">
+        <button class="pixel-btn" id="btnSaveBack">保存并返回</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 视图：游戏 ===== -->
+  <div id="screen-game" class="screen">
+    <div class="game-wrap">
+      <div class="canvas-frame">
+        <canvas id="gameCanvas" width="608" height="608"></canvas>
+        <div id="overlay" class="hidden">
+          <div class="msg" id="ovTitle"></div>
+          <div class="msg sub" id="ovSub"></div>
+          <button class="pixel-btn primary hidden" id="btnOvRestart">重新开始</button>
+          <button class="pixel-btn hidden" id="btnOvMenu">返回主菜单</button>
+        </div>
+      </div>
+      <div class="hud">
+        <div class="hud-title">坦 克 大 战</div>
+      <div class="hud-ver">V0.20</div>
+        <div class="row"><span class="k">弹药</span><span class="v" id="hudAmmo">普通</span></div>
+        <div class="row" id="hudP2Row" style="display:none"><span class="k">P2</span><span class="v" id="hudP2Txt">连杀 0 · Lv.0</span></div>
+        <div class="streak-box">
+          <div class="streak-label">连 杀</div>
+          <div class="streak-num" id="hudStreak">0</div>
+          <div class="streak-sub" id="hudTier">Lv.0</div>
+          <div class="streak-sub lives" id="hudLives">重生 ∞</div>
+        </div>
+        <div class="sep"></div>
+        <div class="hud-btns">
+          <button class="pixel-btn small" id="btnPause">暂停</button>
+          <button class="pixel-btn small danger" id="btnQuit">返回菜单</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 卡牌选择 ===== -->
+  <div id="cardOverlay" class="hidden">
+    <div class="card-box">
+      <div class="card-title" id="cardTitle">第 1 关 通过！</div>
+      <div class="card-sub">选择一项增益带入下一关 · 当前增益：<span id="cardCurrent">无</span></div>
+      <div class="cards" id="cardRow"></div>
+    </div>
+  </div>
+
+  <!-- ===== Boss 战选择 ===== -->
+  <div id="bossOverlay" class="hidden">
+    <div class="card-box">
+      <div class="card-title">B O S S 战</div>
+      <div class="card-sub">选择要挑战的 Boss 关卡（难度沿用当前设置 · 通关后结算）</div>
+      <div class="cards" id="bossRow"></div>
+      <div style="display:flex; justify-content:center; gap:12px; margin-top:10px;">
+        <button class="pixel-btn" id="btnBossCancel">返　回</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Boss 战增益卡牌选择 ===== -->
+  <div id="bossCardOverlay" class="hidden">
+    <div class="card-box">
+      <div class="card-title">增 益 卡 牌</div>
+      <div class="card-sub">挑选至多 6 张增益卡牌带入本场 Boss 战 · 已选 <span id="bossPickCount" style="color:var(--yellow)">0</span>/6</div>
+      <div style="display:flex; justify-content:center; align-items:center; gap:14px; flex-wrap:wrap; padding:2px 0 6px;">
+        <span style="color:var(--dim); font-size:14px; letter-spacing:3px;">难度</span>
+        <div class="option-row" id="bossPickDiff">
+          <button class="opt-btn" data-diff="easy">简单<span class="sub">1 炮击毁</span></button>
+          <button class="opt-btn" data-diff="normal">中等<span class="sub">2 炮击毁</span></button>
+          <button class="opt-btn" data-diff="hard">困难<span class="sub">3 炮击毁</span></button>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:center; align-items:center; gap:14px; flex-wrap:wrap; padding:0 0 6px;">
+        <span style="color:var(--dim); font-size:14px; letter-spacing:3px;">夜战</span>
+        <div class="option-row" id="bossPickNight">
+          <button class="opt-btn" data-night="off">关闭<span class="sub">全图可见</span></button>
+          <button class="opt-btn" data-night="on">开启<span class="sub">战场迷雾</span></button>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:center; align-items:center; gap:14px; flex-wrap:wrap; padding:0 0 6px;">
+        <span style="color:var(--dim); font-size:14px; letter-spacing:3px;">人数</span>
+        <div class="option-row" id="bossPickMode">
+          <button class="opt-btn" data-mode="single">单人<span class="sub">P1 驾驶</span></button>
+          <button class="opt-btn" data-mode="duo">双人<span class="sub">P1 + P2</span></button>
+        </div>
+      </div>
+      <div class="cards" id="bossCardRow"></div>
+      <div style="display:flex; justify-content:center; gap:12px; margin-top:10px;">
+        <button class="pixel-btn" id="btnBossPickStart">开始 Boss 战</button>
+        <button class="pixel-btn" id="btnBossPickBack">返　回</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 新游戏配置 ===== -->
+  <div id="newGameOverlay" class="hidden">
+    <div class="ng-panel">
+      <div class="card-title">新 游 戏</div>
+      <div class="card-sub">选择本局难度、坦克与重生次数</div>
+
+      <div class="ng-group">
+        <div class="label"><span class="tag">难度</span> 敌人强度（击毁所需炮弹数）</div>
+        <div class="option-row" id="ngDifficulty">
+          <button class="opt-btn" data-diff="easy">简单<span class="sub">1 炮击毁</span></button>
+          <button class="opt-btn" data-diff="normal">中等<span class="sub">2 炮击毁</span></button>
+          <button class="opt-btn" data-diff="hard">困难<span class="sub">3 炮击毁</span></button>
+        </div>
+      </div>
+
+      <div class="ng-group">
+        <div class="label"><span class="tag">坦克</span> 玩家坦克类型</div>
+        <div class="option-row" id="ngTank">
+          <button class="opt-btn" data-tank="light">轻型<span class="sub">3格/秒 · 无装甲</span></button>
+          <button class="opt-btn" data-tank="medium">中型<span class="sub">2.5格/秒 · 正面装甲</span></button>
+          <button class="opt-btn" data-tank="heavy">重型<span class="sub">2格/秒 · 重装甲</span></button>
+        </div>
+        <div class="tank-preview">
+          <canvas id="ngTankPreview" width="96" height="96"></canvas>
+          <div class="tank-desc" id="ngTankDesc"></div>
+        </div>
+      </div>
+
+      <div class="ng-group">
+        <div class="label"><span class="tag">重生</span> 本局玩家重生次数</div>
+        <div class="option-row" id="ngLives">
+          <button class="opt-btn" data-lives="infinite">无限重生<span class="sub">∞ 次</span></button>
+          <button class="opt-btn" data-lives="10">10 次<span class="sub">用尽即失败</span></button>
+          <button class="opt-btn" data-lives="5">5 次<span class="sub">用尽即失败</span></button>
+          <button class="opt-btn" data-lives="none">不可重生<span class="sub">一命通关</span></button>
+        </div>
+      </div>
+
+      <div class="ng-group">
+        <div class="label"><span class="tag">人数</span> 游戏人数（双人时 P2 出生在对称位置）</div>
+        <div class="option-row" id="ngMode">
+          <button class="opt-btn" data-mode="single">单人<span class="sub">P1 驾驶</span></button>
+          <button class="opt-btn" data-mode="duo">双人<span class="sub">P1 + P2</span></button>
+        </div>
+      </div>
+
+      <div class="ng-group" id="ngTank2Group" style="display:none;">
+        <div class="label"><span class="tag">P2 坦克</span> 双人模式 P2 坦克类型</div>
+        <div class="option-row" id="ngTank2">
+          <button class="opt-btn" data-tank="light">轻型<span class="sub">3格/秒 · 无装甲</span></button>
+          <button class="opt-btn" data-tank="medium">中型<span class="sub">2.5格/秒 · 正面装甲</span></button>
+          <button class="opt-btn" data-tank="heavy">重型<span class="sub">2格/秒 · 重装甲</span></button>
+        </div>
+        <div class="tank-preview">
+          <canvas id="ngTankPreview2" width="96" height="96"></canvas>
+          <div class="tank-desc" id="ngTankDesc2"></div>
+        </div>
+      </div>
+
+      <div class="ng-group">
+        <div class="label"><span class="tag">夜战</span> 视角模式（被砖/钢阻挡的区域不可见）</div>
+        <div class="option-row" id="ngNight">
+          <button class="opt-btn" data-night="off">关闭<span class="sub">全图可见</span></button>
+          <button class="opt-btn" data-night="on">开启<span class="sub">战场迷雾</span></button>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:center; gap:12px; margin-top:8px;">
+        <button class="pixel-btn primary" id="btnNgStart">开 始</button>
+        <button class="pixel-btn" id="btnNgCancel">取 消</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+"use strict";
+/* ================= 常量 ================= */
+const CELL = 32, COLS = 19, ROWS = 19;
+const CW = CELL * COLS, CH = CELL * ROWS;
+const BULLET_SPEED = 256;          // 炮弹速度：8格/秒
+const ENEMY_FIRE_INT = 3;          // 敌方开炮间隔：3秒1发
+const PLAYER_FIRE_INT = 0.667;      // 玩家基础开炮间隔：1.5发/秒（原1秒1发，+50%）
+const MAX_CONCURRENT = 4;          // 场上同时存在敌方上限
+const TOTAL_PER_LEVEL = 8;         // 每关敌方总数
+/* 敌方坦克类型配置：轻型为基础，quad=四向射击（第3关起）、fast=疾行兵（第3关起） */
+const ENEMY_TYPES = {
+  light: { name:"轻型", speed:70, accel:140, decel:350 }, // accel/decel 预留（当前为瞬时速度）
+  quad:  { name:"四向射手", speed:50, accel:100, decel:250 },
+  fast:  { name:"疾行兵", speed:96, accel:192, decel:480 }
+};
+/* Boss 血量（随难度）：easy / normal / hard */
+const BOSS_SHIP_HP    = { easy:20, normal:30, hard:40 };  // 路上战舰·小和号
+const BOSS_TRAIN_HEAD = { easy:20, normal:30, hard:40 };  // 像素无限列车·车头
+const BOSS_TRAIN_SEG  = { easy:5,  normal:8,  hard:12 };  // 像素无限列车·单节车厢
+const BOSS_GODZILLA_HP = { easy:40, normal:60, hard:80 };  // 机械哥斯拉（Boss 战限定，血量翻倍）
+/* 每关敌人计划：quad 第3关起 2台、每关+1、至多6台；fast 第3关必现1台、其后50%概率1台 */
+function levelEnemyPlan(level){
+  const plan = { light: TOTAL_PER_LEVEL, quad: 0, fast: 0 };
+  if(level >= 3){
+    plan.quad = Math.min(2 + (level - 3), 6);
+    plan.fast = level === 3 ? 1 : (Math.random() < 0.5 ? 1 : 0);
+  }
+  return plan;
+}
+function bossForLevel(level){
+  if(level === 10) return "train";   // 像素无限列车仅第 10 关
+  if(level === 5) return "ship";     // 路上战舰小和号仅第 5 关
+  return null;
+}
+/* 玩家坦克属性：最高速度（格/秒），瞬时达到/停止 */
+const TANK_ATTR = {
+  light:  { speed:96 },  // 3 格/秒
+  medium: { speed:80 },  // 2.5 格/秒
+  heavy:  { speed:64 }   // 2 格/秒
+};
+const DIRS = [[0,-1],[1,0],[0,1],[-1,0]]; // 上右下左
+const TANK_NAMES = { light:"轻型", medium:"中型", heavy:"重型" };
+const DIFF_NAMES = { easy:"简单", normal:"中等", hard:"困难" };
+const DIFF_HP = { easy:1, normal:2, hard:3 };
+const SKILL_INFO = {
+  overdrive:{ name:"引擎过载", active:5, cd:15 },
+  positron: { name:"阳电子炮", active:0, cd:20 },
+  ram:      { name:"冲撞碾压", active:8, cd:15 }
+};
+// 地形编码：0空 1砖 2钢 3大本营 4草丛 5沼泽 6水 8/9/10铁制护墙(剩余1/2/3发)
+
+/* ================= 像素调色板 ================= */
+const PAL = {
+  trkD:"#33373d", trkM:"#575d66", trkL:"#7d848e",
+  brl:"#aeb4ba", brlD:"#666c73",
+  gBody:"#58b94a", gDark:"#2e7d32", gHi:"#9ce07a",
+  eBody:"#c9cdd2", eDark:"#7a8087", eHi:"#eef1f4",
+  e2Body:"#7fb2e8", e2Dark:"#3f6ea5", e2Hi:"#cfe2fa",
+  e3Body:"#e8837a", e3Dark:"#a34b42", e3Hi:"#f7c1bb",
+  yellow:"#ffd54d", red:"#e84545", flagPole:"#9aa0a6"
+};
+
+/* ================= 坦克像素精灵（现代坦克俯视角，轻/中/重三型） ================= */
+/* 俯视角特征：方正车体+双侧履带裙板、中央炮塔、炮管指向前方、首上/车尾装甲带 */
+const SPR_LIGHT = [
+  "................",
+  ".......bb.......",
+  ".......bb.......",
+  ".......bb.......",
+  ".......bb.......",
+  "..TT..gggg..TT..",
+  "..TT.GGGGGG.TT..",
+  "..TT.GGgGGG.TT..",
+  "..TT.GGGGGG.TT..",
+  "..TT.GGGGGG.TT..",
+  "..TTGGGGGGGGTT..",
+  "..TTGgGGGGgGTT..",
+  "..TTGGGGGGGGTT..",
+  "..TTTttttttTTT..",
+  "..TTTTTTTTTTTT..",
+  "................"
+];
+const SPR_MEDIUM = [
+  "................",
+  ".......bb.......",
+  ".......bb.......",
+  ".......bb.......",
+  ".......bb.......",
+  ".......bb.......",
+  ".TT..gggggg..TT.",
+  ".TT.GGGGGGGG.TT.",
+  ".TT.GGgGGGgG.TT.",
+  ".TT.GGGGGGGG.TT.",
+  ".TT.GGGGGGGG.TT.",
+  ".TTGGGGGGGGGGTT.",
+  ".TTGgGGGGGGgGTT.",
+  ".TTTttttttttTTT.",
+  ".TTTTTTTTTTTTTT.",
+  "................"
+];
+const SPR_HEAVY = [
+  "................",
+  "......bbbb......",
+  "......bbbb......",
+  "......bbbb......",
+  "......bbbb......",
+  ".TT..gggggg..TT.",
+  ".TT.GGGGGGGG.TT.",
+  ".TT.GGGGGGGG.TT.",
+  ".TTGGGGGGGGGGTT.",
+  ".TTGgGGGGGGgGTT.",
+  ".TTGGGGGGGGGGTT.",
+  ".TTGgGGGGGGgGTT.",
+  ".TTGGGGGGGGGGTT.",
+  ".TTTttttttttTTT.",
+  ".TTTTTTTTTTTTTT.",
+  "................"
+];
+const BASE_SPRITE = [
+  "................",
+  ".....YY.........",
+  "....YYYY........",
+  ".....YY.........",
+  "....RRRRRR......",
+  "...RRRRRRRR.....",
+  "...RRRRRRRR.....",
+  "...RRRRRRRR.....",
+  ".......GG.......",
+  ".......GG.......",
+  ".......GG.......",
+  ".......GG.......",
+  ".......GG.......",
+  ".......GG.......",
+  ".......GG.......",
+  ".......GG......."
+];
+
+function enemySpriteMarkers(){
+  return SPR_MEDIUM.map(r => r.replace(/G/g, "E").replace(/g/g, "e").replace(/H/g, "h"));
+}
+/* 四向射手：十字炮塔 + 四根炮管（上/下/左/右） */
+function quadSprite(){
+  return [
+    "................",
+    ".......EE.......",
+    ".......EE.......",
+    ".......EE.......",
+    "....E..EE..E....",
+    "....E.EEEE.E....",
+    "....EEEEEEEE....",
+    "....EEeEEeEE....",
+    "....EEEEEEEE....",
+    "....E.EEEE.E....",
+    "....E..EE..E....",
+    "..TT..EE..TT....",
+    "..TTTttttTTT....",
+    "..TTTTTTTTTT....",
+    "................",
+    "................"
+  ];
+}
+/* 疾行兵：轻装流线窄车身 + 前置小炮塔 */
+function fastSprite(){
+  return [
+    "................",
+    ".......bb.......",
+    ".......bb.......",
+    ".......EE.......",
+    "......EEEE......",
+    "......EEEE......",
+    ".....EEeEE......",
+    ".....EEEEE......",
+    ".....EEeEE......",
+    "......EEEE......",
+    "......EEEE......",
+    "..TT..EE...TT...",
+    "..TTTttttTTT....",
+    "..TTTTTTTTTT....",
+    "................",
+    "................"
+  ];
+}
+
+const TANK_PALS = {
+  light:  { T:"#33373d", t:"#575d66", b:"#aeb4ba", D:"#7d848e", G:"#7cc85e", g:"#3f8f3a", H:"#c9ef9c" },
+  medium: { T:"#33373d", t:"#575d66", b:"#aeb4ba", D:"#7d848e", G:"#58b94a", g:"#2e7d32", H:"#9ce07a" },
+  heavy:  { T:"#33373d", t:"#575d66", b:"#aeb4ba", D:"#666c73", G:"#3f8f3a", g:"#1f5c26", H:"#7cc85e" }
+};
+const PAL_BASE = { Y:"#ffd54d", R:"#e84545", G:"#9aa0a6" };
+function enemyPal(body, dark, hi){ return { T:"#33373d", t:"#575d66", b:"#8f959c", E:body, e:dark, h:hi }; }
+const ENEMY_PALS = {
+  easy:  enemyPal("#c9cdd2","#7a8087","#eef1f4"),
+  normal:enemyPal("#7fb2e8","#3f6ea5","#cfe2fa"),
+  hard:  enemyPal("#e8837a","#a34b42","#f7c1bb")
+};
+const ENEMY_KEYS = { easy:"enemyEasy", normal:"enemyNormal", hard:"enemyHard" };
+const SPRITES = {
+  player_light: SPR_LIGHT,
+  player_medium: SPR_MEDIUM,
+  player_heavy: SPR_HEAVY,
+  base: BASE_SPRITE,
+  enemyEasy: enemySpriteMarkers(),
+  enemyNormal: enemySpriteMarkers(),
+  enemyHard: enemySpriteMarkers(),
+  enemyQuad: quadSprite(),
+  enemyFast: fastSprite()
+};
+const PLAYER_SPRITE_KEY = { light:"player_light", medium:"player_medium", heavy:"player_heavy" };
+
+/* 精灵旋转缓存 */
+const spriteCache = {};
+function spriteFor(key, dir){
+  const k = key + "|" + dir;
+  if(!spriteCache[k]) spriteCache[k] = rotateSprite(SPRITES[key] || SPRITES.enemyEasy, dir);
+  return spriteCache[k];
+}
+function rotateSprite(s, n){
+  let g = s.map(r => r.split(""));
+  for(let k=0; k<n; k++){
+    const ng = g.map(() => new Array(g.length).fill("."));
+    for(let y=0; y<g.length; y++)
+      for(let x=0; x<g.length; x++)
+        ng[x][g.length-1-y] = g[y][x];
+    g = ng;
+  }
+  return g.map(r => r.join(""));
+}
+function drawSprite(ctx, sp, px, py, scale, pal){
+  for(let y=0; y<sp.length; y++){
+    const row = sp[y];
+    for(let x=0; x<row.length; x++){
+      const c = row[x];
+      if(c === "." || c === " ") continue;
+      ctx.fillStyle = (pal && pal[c]) || PAL[c] || c;
+      ctx.fillRect(px + x*scale, py + y*scale, scale, scale);
+    }
+  }
+}
+
+/* ================= 设置 ================= */
+const SETTINGS_KEY = "pixel-tank-settings";
+const SAVE_KEY = "pixel-tank-save";          // 继续游戏存档
+const DEFAULT_LIVES = "infinite";            // infinite | 10 | 5 | none
+const LIVES_MAX = { infinite: Infinity, "10": 10, "5": 5, none: 0 };
+const DEFAULT_KEYS = { up:"KeyW", down:"KeyS", left:"KeyA", right:"KeyD", fire:"Space", skill:"KeyV", bomb:"KeyB" };
+const DEFAULT_KEYS2 = { up:"ArrowUp", down:"ArrowDown", left:"ArrowLeft", right:"ArrowRight", fire:"Numpad0", skill:"NumpadEnter", bomb:"NumpadDecimal" };
+const KEY_LABELS = {
+  Space:"空格", KeyW:"W", KeyS:"S", KeyA:"A", KeyD:"D", KeyV:"V", KeyB:"B",
+  ArrowUp:"↑", ArrowDown:"↓", ArrowLeft:"←", ArrowRight:"→",
+  Enter:"回车", ShiftLeft:"左Shift", ShiftRight:"右Shift", ControlLeft:"左Ctrl",
+  ControlRight:"右Ctrl", AltLeft:"左Alt", AltRight:"右Alt", KeyP:"P", Escape:"Esc",
+  KeyJ:"J", KeyK:"K", KeyL:"L", KeyI:"I", KeyO:"O", KeyF:"F", KeyG:"G", KeyH:"H",
+  KeyQ:"Q", KeyE:"E", KeyR:"R", KeyT:"T", KeyY:"Y", KeyU:"U", KeyZ:"Z", KeyX:"X",
+  KeyC:"C", KeyN:"N", KeyM:"M",
+  Digit1:"1", Digit2:"2", Digit3:"3", Digit4:"4", Digit5:"5",
+  Digit6:"6", Digit7:"7", Digit8:"8", Digit9:"9", Digit0:"0",
+  MouseLeft:"鼠标左键", MouseRight:"鼠标右键", MouseMiddle:"鼠标中键",
+  MouseBack:"鼠标侧键1", MouseForward:"鼠标侧键2",
+  Numpad0:"小键盘0", Numpad1:"小键盘1", Numpad2:"小键盘2", Numpad3:"小键盘3",
+  Numpad4:"小键盘4", Numpad5:"小键盘5", Numpad6:"小键盘6", Numpad7:"小键盘7",
+  Numpad8:"小键盘8", Numpad9:"小键盘9", NumpadEnter:"小键盘回车", NumpadDecimal:"小键盘."
+};
+// 鼠标按键 → 统一键位标识（与键盘 e.code 同层）
+const MOUSE_CODES = { 0:"MouseLeft", 1:"MouseMiddle", 2:"MouseRight", 3:"MouseBack", 4:"MouseForward" };
+function keyLabel(code){ return KEY_LABELS[code] || (code.startsWith("Key") ? code.slice(3) : code); }
+
+let settings = loadSettings();
+function loadSettings(){
+  try{
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if(raw){
+      const s = JSON.parse(raw);
+      if(s && s.difficulty && s.tankType && s.keys){
+        s.keys = Object.assign({}, DEFAULT_KEYS, s.keys); // 兼容旧存档/新增键位
+        if(!s.lives) s.lives = DEFAULT_LIVES;
+        if(!s.tankType2) s.tankType2 = "medium";               // P2 坦克类型（双人用）
+        if(typeof s.sfxVol !== "number") s.sfxVol = 100;
+        if(typeof s.bgmVol !== "number") s.bgmVol = 100;
+        if(typeof s.vibrate !== "boolean") s.vibrate = true;
+        if(typeof s.night !== "boolean") s.night = false;
+        if(s.mode !== "duo") s.mode = "single";
+        if(!s.keys2) s.keys2 = Object.assign({}, DEFAULT_KEYS2);
+        else s.keys2 = Object.assign({}, DEFAULT_KEYS2, s.keys2);
+        return s;
+      }
+    }
+  }catch(e){}
+  return { difficulty:"normal", tankType:"medium", tankType2:"medium", lives:DEFAULT_LIVES, sfxVol:100, bgmVol:100, vibrate:true, night:false, mode:"single", keys:Object.assign({}, DEFAULT_KEYS), keys2:Object.assign({}, DEFAULT_KEYS2) };
+}
+function saveSettings(){
+  try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }catch(e){}
+}
+
+/* ================= 屏幕管理 ================= */
+const screens = {
+  title: document.getElementById("screen-title"),
+  settings: document.getElementById("screen-settings"),
+  game: document.getElementById("screen-game")
+};
+function showScreen(name){
+  Object.keys(screens).forEach(k => screens[k].classList.toggle("active", k === name));
+}
+
+/* ================= DOM 引用 ================= */
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+const overlay = document.getElementById("overlay");
+const ovTitle = document.getElementById("ovTitle");
+const ovSub = document.getElementById("ovSub");
+const btnOvRestart = document.getElementById("btnOvRestart");
+const btnOvMenu = document.getElementById("btnOvMenu");
+const cardOverlay = document.getElementById("cardOverlay");
+const cardRow = document.getElementById("cardRow");
+const bossOverlay = document.getElementById("bossOverlay");
+const bossRow = document.getElementById("bossRow");
+const bossCardOverlay = document.getElementById("bossCardOverlay");
+const bossCardRow = document.getElementById("bossCardRow");
+
+/* ================= 按键 ================= */
+const pressed = {};
+const pressOrder = []; // 按下顺序：移动时只取最后按下的移动键，杜绝斜向移动
+let rebinding = null;
+
+/* 解析按键按钮 data-key → 设置对象与动作名（up2 → keys2.up） */
+function keyTarget(dk){
+  if(dk && dk.endsWith("2")) return { set: settings.keys2, name: dk.slice(0, -1), isP2: true };
+  return { set: settings.keys, name: dk, isP2: false };
+}
+function moveKey(code){
+  for(const k of ["up","down","left","right"]){
+    if(settings.keys[k] === code || settings.keys2[k] === code) return k;
+  }
+  return null;
+}
+function isGameKey(code){
+  return moveKey(code) !== null ||
+    code === settings.keys.fire || code === settings.keys.skill || code === settings.keys.bomb ||
+    code === settings.keys2.fire || code === settings.keys2.skill || code === settings.keys2.bomb ||
+    code === "Escape" || code === "KeyP";
+}
+/* 把键盘/鼠标输入统一归一化为键位标识 */
+function inputCode(e){
+  if(e.type === "mousedown" || e.type === "mouseup") return MOUSE_CODES[e.button];
+  return e.code;
+}
+
+document.addEventListener("keydown", e => {
+  const code = e.code;
+  if(rebinding){
+    e.preventDefault();
+    if(code === "Escape"){ rebinding = null; refreshKeyButtons(); return; }
+    const t = keyTarget(rebinding);
+    t.set[t.name] = code;
+    rebinding = null;
+    saveSettings();
+    refreshKeyButtons();
+    return;
+  }
+  if(isGameKey(code)) e.preventDefault();
+  if(!pressed[code]) pressOrder.push(code);
+  pressed[code] = true;
+  if(!game) return;
+  if(code === "Escape" || code === "KeyP"){ togglePause(); return; }
+  if(code === settings.keys.skill && !e.repeat && game.state === "playing") useSkill(game.player);
+  if(code === settings.keys.bomb && !e.repeat && game.state === "playing") deployBomb(game.player);
+  // P2 技能/炸弹
+  if(game.player2 && game.state === "playing"){
+    if(code === settings.keys2.skill && !e.repeat) useSkill(game.player2);
+    if(code === settings.keys2.bomb && !e.repeat) deployBomb(game.player2);
+  }
+  // 弹药切换：P1 数字键 1/2/3；P2 小键盘 1/2/3
+  if(game.state === "playing" && !game.player.dead){
+    if(code === "Digit1" && !e.repeat){ game.player.ammo = "normal"; showToast("弹药：普通炮弹"); updateHUD(); }
+    else if(code === "Digit2" && !e.repeat && game.buffs.apfsds){ game.player.ammo = "apfsds"; showToast("弹药：穿甲弹（2 倍速·2 倍伤·穿透）"); updateHUD(); }
+    else if(code === "Digit3" && !e.repeat && game.buffs.he){ game.player.ammo = "he"; showToast("弹药：榴弹（爆炸范围伤害）"); updateHUD(); }
+  }
+  if(game.player2 && !game.player2.dead && game.state === "playing"){
+    if(code === "Numpad1" && !e.repeat){ game.player2.ammo = "normal"; showToast("P2 弹药：普通炮弹"); updateHUD(); }
+    else if(code === "Numpad2" && !e.repeat && game.buffs.apfsds){ game.player2.ammo = "apfsds"; showToast("P2 弹药：穿甲弹"); updateHUD(); }
+    else if(code === "Numpad3" && !e.repeat && game.buffs.he){ game.player2.ammo = "he"; showToast("P2 弹药：榴弹"); updateHUD(); }
+  }
+});
+document.addEventListener("keyup", e => {
+  const code = e.code;
+  pressed[code] = false;
+  const idx = pressOrder.indexOf(code);
+  if(idx >= 0) pressOrder.splice(idx, 1);
+});
+
+/* 鼠标按键输入：可绑定到任意动作；游戏中仅在点击战场画布时生效 */
+document.addEventListener("mousedown", e => {
+  const code = inputCode(e);
+  if(!code) return;
+  if(rebinding){
+    const kb = e.target.closest ? e.target.closest(".kbtn") : null;
+    if(kb && kb.dataset.key !== rebinding){ rebinding = kb.dataset.key; refreshKeyButtons(); return; } // 点击其他按键按钮→切换目标；点击同一按钮保持等待
+    e.preventDefault();
+    const t = keyTarget(rebinding);
+    t.set[t.name] = code;
+    rebinding = null;
+    saveSettings();
+    refreshKeyButtons();
+    return;
+  }
+  if(e.target !== canvas) return;             // 点击UI按钮不触发游戏输入
+  if(e.button === 1 || e.button === 3 || e.button === 4) e.preventDefault();
+  if(!pressed[code]) pressOrder.push(code);
+  pressed[code] = true;
+  if(game && game.state === "playing" && !game.player.dead){
+    if(code === settings.keys.skill) useSkill(game.player);
+    if(code === settings.keys.bomb) deployBomb(game.player);
+  }
+});
+document.addEventListener("mouseup", e => {
+  const code = inputCode(e);
+  if(code){
+    pressed[code] = false;
+    const idx = pressOrder.indexOf(code);
+    if(idx >= 0) pressOrder.splice(idx, 1);
+  }
+});
+window.addEventListener("contextmenu", e => {
+  if(e.target === canvas) e.preventDefault(); // 游戏画布上禁用右键菜单
+});
+
+/* ================= 标题演示动画 ================= */
+(function(){
+  const demo = document.getElementById("titleDemo");
+  const dctx = demo.getContext("2d");
+  let t = 0, dir = 1, tx = 40;
+  function drawDemo(){
+    dctx.fillStyle = "#0b0b10";
+    dctx.fillRect(0,0,192,192);
+    dctx.fillStyle = "#5c2c12";
+    dctx.fillRect(0,150,192,42);
+    dctx.fillStyle = "#a34a22";
+    for(let i=0;i<192;i+=16){
+      dctx.fillRect(i,150,16,8);
+      dctx.fillRect(i+8,158,16,8);
+      dctx.fillStyle = "#a34a22";
+    }
+    dctx.fillStyle = "#2a1408";
+    dctx.fillRect(0,157,192,2);
+    dctx.strokeStyle = "rgba(255,255,255,.05)";
+    dctx.strokeRect(0.5,0.5,191,191);
+    t += 1/60;
+    tx += dir*0.6;
+    if(tx < 12) dir = 1;
+    if(tx > 128) dir = -1;
+    const bob = (t*6) % 1 < .5 ? 0 : 1;
+    drawSprite(dctx, spriteFor("player_medium", dir === 1 ? 1 : 3), tx, 116+bob, 2, TANK_PALS.medium);
+    dctx.fillStyle = "#ffd54d";
+    dctx.fillRect(tx+18, 92, 6, 6);
+    requestAnimationFrame(drawDemo);
+  }
+  requestAnimationFrame(drawDemo);
+})();
+
+/* ================= 工具 ================= */
+function randInt(a, b){ return a + Math.floor(Math.random() * (b - a + 1)); }
+
+/* ================= 游戏状态 ================= */
+let game = null;
+let lastTime = performance.now();
+
+function makePlayer(t, x, y, dir){
+  const tankType = t || settings.tankType;
+  const attr = TANK_ATTR[tankType];
+  const p = {
+    x: (x ?? 4*CELL), y: (y ?? 17*CELL), dir: (dir ?? 0),
+    dead: false, respawn: 0, inv: 1.2, fireCd: 0,
+    tankType: tankType,                                   // 各自坦克类型（P1/P2 可不同）
+    armor: {front:0, side:0}, maxFront:0, maxSide:0,
+    baseSpeed: attr.speed, level: 0, killStreak: game ? game.streak : 0,
+    vx: 0, vy: 0,                                             // 瞬时速度（无加减速）
+    skillType: { light:"overdrive", medium:"positron", heavy:"ram" }[tankType],
+    skillCd: 0, skillActive: 0, skillSnd: 0, moveSnd: 0,
+    ammo: "normal",                               // 弹药：normal / apfsds(穿甲) / he(榴弹)
+    isPlayer: true
+  };
+  applyArmor(p);
+  return p;
+}
+function applyArmor(p){
+  const t = p.tankType || settings.tankType;
+  if(t === "light"){ p.armor = {front:0, side:0}; p.maxFront = 0; p.maxSide = 0; }
+  else if(t === "medium"){ p.armor = {front:2, side:0}; p.maxFront = 2; p.maxSide = 0; }
+  else { p.armor = {front:3, side:2}; p.maxFront = 3; p.maxSide = 2; }
+}
+
+/* ================= 基地工事 ================= */
+function fortifyLayout(level){
+  const l1 = [[16,8],[16,9],[16,10],[17,8],[17,10]];
+  const l2 = [[15,7],[15,8],[15,9],[15,10],[15,11],[16,7],[16,11],[17,7],[17,11]];
+  const out = {};
+  const put = (arr, v) => arr.forEach(([r,c]) => { out[r*COLS+c] = v; });
+  if(level >= 1) put(l2, 1);
+  if(level >= 2) put(l1, 10); else put(l1, 1); // 10=铁制护墙剩余3发
+  return out;
+}
+function writeFortify(level){
+  const layout = fortifyLayout(level);
+  for(const key in layout){
+    const r = Math.floor(key / COLS), c = key % COLS;
+    game.map[r][c] = layout[key];
+  }
+}
+function applyFortify(){
+  const b = game.buffs;
+  const expect = fortifyLayout(b.fortify);
+  let intact = true;
+  for(const key in expect){
+    const r = Math.floor(key / COLS), c = key % COLS;
+    if(game.map[r][c] !== expect[key]) intact = false;
+  }
+  if(intact && b.fortify < 2) b.fortify++;
+  writeFortify(b.fortify);
+  addEffect("spark", 9*CELL+16, 16*CELL+16, 0.6);
+  addEffect("spark", 9*CELL+16, 15*CELL+16, 0.6);
+}
+
+/* ================= 地图生成 ================= */
+/* 按关卡返回地形权重：低关卡以砖块为主，随关卡逐步解锁草丛→钢铁→沼泽→水 */
+function terrainWeights(level){
+  const lv = Math.max(1, Math.min(5, level));
+  const table = {
+    1: { 1: 10 },                            // 纯砖
+    2: { 1: 7,  4: 3 },                      // +草丛
+    3: { 1: 5.5, 4: 2.5, 2: 2 },             // +钢制方块
+    4: { 1: 4.5, 4: 2, 2: 1.5, 5: 2 },       // +沼泽
+    5: { 1: 4, 4: 1.8, 2: 1.2, 5: 1.5, 6: 1.5 } // +水
+  };
+  return table[lv];
+}
+function genMap(){
+  const m = Array.from({length: ROWS}, () => new Array(COLS).fill(0));
+  for(let c=0; c<COLS; c++){ m[0][c] = 2; m[ROWS-1][c] = 2; }
+  for(let r=0; r<ROWS; r++){ m[r][0] = 2; m[r][COLS-1] = 2; }
+  m[17][9] = 3;
+  // 保护区：玩家出生、基地及工事、敌人刷新行
+  const prot = new Set();
+  const addP = (r1,r2,c1,c2) => { for(let r=r1; r<=r2; r++) for(let c=c1; c<=c2; c++) prot.add(r*COLS+c); };
+  addP(16,17,3,5);
+  addP(15,17,7,11);
+  addP(1,1,1,17);
+  // 按关卡权重构建地形类型池
+  const weights = terrainWeights(game ? game.level : 1);
+  const typeList = [];
+  for(const k in weights){
+    const cnt = Math.max(1, Math.round(weights[k] * 4));
+    for(let i=0; i<cnt; i++) typeList.push(Number(k));
+  }
+  // 以连续斑块形式生成地形：同一类型聚集成片，而非随机撒点
+  const patches = randInt(16, 22);
+  for(let i=0; i<patches; i++){
+    let c = randInt(1,17), r = randInt(1,17), tries = 0;
+    while(prot.has(r*COLS+c) && tries < 60){ c = randInt(1,17); r = randInt(1,17); tries++; }
+    if(prot.has(r*COLS+c)) continue;
+    const type = typeList[randInt(0, typeList.length-1)];
+    const shape = randInt(0, 3);
+    const cells = [];
+    if(shape === 0){                      // 矩形块
+      const w = randInt(2,4), h = randInt(2,3);
+      for(let dr=0; dr<h; dr++) for(let dc=0; dc<w; dc++) cells.push([dc - Math.floor(w/2), dr - Math.floor(h/2)]);
+    } else if(shape === 1){               // 十字
+      const s = randInt(1,2);
+      for(let k=-s; k<=s; k++){ cells.push([k,0]); cells.push([0,k]); }
+    } else if(shape === 2){               // 横线
+      const s = randInt(1,2);
+      for(let k=-s; k<=s; k++) cells.push([k,0]);
+    } else {                              // 竖线
+      const s = randInt(1,2);
+      for(let k=-s; k<=s; k++) cells.push([0,k]);
+    }
+    for(const [dc, dr] of cells){
+      const rr = r + dr, cc = c + dc;
+      if(rr < 1 || rr > 17 || cc < 1 || cc > 17) continue;
+      if(prot.has(rr*COLS+cc) || m[rr][cc] !== 0) continue;
+      m[rr][cc] = type;
+    }
+  }
+  return m;
+}
+
+/* ================= 碰撞 ================= */
+function cellSolidForBullet(c, r){
+  if(c < 0 || c >= COLS || r < 0 || r >= ROWS) return false;
+  const v = game.map[r][c];
+  return v === 1 || v === 2 || v === 3 || v >= 8;
+}
+function cellBlockedFor(c, r, mover, tankType){
+  if(c < 0 || c >= COLS || r < 0 || r >= ROWS) return true;
+  const v = game.map[r][c];
+  if(v === 1 || v === 2 || v === 3 || v >= 8) return true;
+  if(v === 6 && mover === "player" && tankType === "heavy") return true; // 水：重型坦克不可通行
+  return false;
+}
+function cellWalkable(c, r, mover, tankType){
+  return !cellBlockedFor(c, r, mover, tankType);
+}
+function cellHasTank(c, r, self){
+  const list = [game.player].concat(game.enemies);
+  for(const t of list){
+    if(!t || t === self || t.dead) continue;
+    if(t.isBoss && t.bossId === "train"){
+      if(Math.floor((t.x + 16) / CELL) === c && Math.floor((t.y + 16) / CELL) === r) return true;
+      for(const s of t.segments){
+        if(Math.floor((s.x + 16) / CELL) === c && Math.floor((s.y + 16) / CELL) === r) return true;
+      }
+      continue;
+    }
+    const tc = Math.floor((t.x + 16) / CELL), tr = Math.floor((t.y + 16) / CELL);
+    if(tc === c && tr === r) return true;
+  }
+  return false;
+}
+function cellOf(t){ return { c: Math.floor((t.x + 16) / CELL), r: Math.floor((t.y + 16) / CELL) }; }
+/* 矩形是否与任意存活坦克重叠（self 排除自身；坦克矩形按 tankRect 计算） */
+function rectHasTank(x, y, w, h, self){
+  const list = [game.player].concat(game.enemies);
+  for(const t of list){
+    if(!t || t === self || t.dead) continue;
+    const r = tankRect(t);
+    if(x < r.x + r.w && x + w > r.x && y < r.y + r.h && y + h > r.y) return true;
+  }
+  return false;
+}
+function rectBlocked(x, y, w, h, self, ignoreTanks){
+  const c0 = Math.floor(x / CELL), c1 = Math.floor((x + w - 1) / CELL);
+  const r0 = Math.floor(y / CELL), r1 = Math.floor((y + h - 1) / CELL);
+  const mover = self && self.isPlayer ? "player" : "enemy";
+  const tt = self ? self.tankType : null;
+  for(let c=c0; c<=c1; c++)
+    for(let r=r0; r<=r1; r++)
+      if(cellBlockedFor(c, r, mover, tt)) return true;
+  if(!ignoreTanks) return rectHasTank(x, y, w, h, self);   // Boss 无视普通坦克阻挡
+  return false;
+}
+/* 把与玩家重叠的敌人平滑推开（只推出重叠量，避免整格瞬移闪现） */
+function pushEnemyAway(e, p){
+  const ra = tankRect(p), rb = tankRect(e);
+  const ovX = Math.min(ra.x + ra.w, rb.x + rb.w) - Math.max(ra.x, rb.x);
+  const ovY = Math.min(ra.y + ra.h, rb.y + rb.h) - Math.max(ra.y, rb.y);
+  let nx = e.x, ny = e.y;
+  if(ovX <= ovY){
+    nx = e.x > p.x ? e.x + ovX + 1 : e.x - ovX - 1;
+  } else {
+    ny = e.y > p.y ? e.y + ovY + 1 : e.y - ovY - 1;
+  }
+  if(!rectBlocked(nx, ny, CELL, CELL, e)){ e.x = nx; e.y = ny; return; }
+  const dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+  const awayX = e.x - p.x, awayY = e.y - p.y;
+  dirs.sort((a, b) => (b[0]*awayX + b[1]*awayY) - (a[0]*awayX + a[1]*awayY));
+  for(const [dx, dy] of dirs){
+    const px2 = e.x + dx*CELL, py2 = e.y + dy*CELL;
+    if(px2 < 0 || px2 > CW - CELL || py2 < 0 || py2 > CH - CELL) continue;
+    if(!rectBlocked(px2, py2, CELL, CELL, e)){ e.x = px2; e.y = py2; return; }
+  }
+}
+
+/* ================= 移速与射速 ================= */
+function currentSpeed(t){
+  if(t.isPlayer){
+    if(t.skillActive > 0) return t.skillType === "ram" ? 96 : 128; // 冲撞3格/s 过载4格/s（+1格/秒，无视地形）
+    let s = t.baseSpeed * (1 + 0.1 * t.level);                     // 每级+10%
+    const {c, r} = cellOf(t);
+    const v = game.map[r][c];
+    if(v === 5) s *= 0.6;                                          // 沼泽 -40%
+    else if(v === 6) s *= t.tankType === "light" ? 0.8 : 0.5; // 水 轻-20% 中-50%（重坦不可通行）
+    return s;
+  }
+  let s = t.speed;                                    // 敌方目标最高速度（当前轻型70px/s）
+  const {c, r} = cellOf(t);
+  const v = game.map[r][c];
+  if(v === 5) s *= 0.6;
+  else if(v === 6) s *= 0.5;
+  return s;
+}
+function fireInterval(t){
+  if(t.isPlayer){
+    if(t.skillActive > 0 && t.skillType === "overdrive") return 0.333; // 过载0.33秒1发（基础射速+50%后同步提升）
+    const base = PLAYER_FIRE_INT + (t.ammo === "normal" ? 0 : 0.5);  // 穿甲/榴弹装填 +0.5s
+    return base / (1 + 0.1 * t.level);                               // 每级射速+10%
+  }
+  return ENEMY_FIRE_INT;
+}
+
+/* ================= 移动 ================= */
+function smashAhead(t, dx, dy){
+  const {c, r} = cellOf(t);
+  const fc = c + dx, fr = r + dy;
+  if(fc >= 0 && fc < COLS && fr >= 0 && fr < ROWS){
+    if(game.map[fr][fc] === 1){
+      game.map[fr][fc] = 0;
+      addEffect("brick", fc*CELL+16, fr*CELL+16, 0.4);
+    }
+  }
+  for(const e of game.enemies){
+    if(e.dead) continue;
+    const ec = Math.floor((e.x + 16) / CELL), er = Math.floor((e.y + 16) / CELL);
+    if(e.isBoss){ // 撞到 Boss：玩家损坏，优先于冲撞碾压的碰撞伤害
+      const egc = Math.floor(e.x / CELL), egr = Math.floor(e.y / CELL);
+      const inside = e.bossId === "train"
+        ? (ec === egc && er === egr)
+        : (fc >= egc && fc < egc + bossGridW(e) && fr >= egr && fr < egr + bossGridH(e));
+      if(inside){ destroyTank(t, t === game.player); return; }
+      continue;
+    }
+    if(ec === fc && er === fr) killEnemy(e, t === game.player ? "player" : "player2");
+  }
+}
+/* Boss 体型辅助：宽/高/中心（战舰 64×64，哥斯拉 96×64，列车 32×32） */
+function bossW(e){ return e.bossId === "ship" ? 64 : e.bossId === "godzilla" ? 96 : 32; }
+function bossH(e){ return e.bossId === "ship" ? 64 : e.bossId === "godzilla" ? 96 : 32; }
+function bossCX(e){ return e.x + (e.bossId === "ship" ? 32 : e.bossId === "godzilla" ? 48 : 16); }
+function bossCY(e){ return e.y + (e.bossId === "ship" ? 32 : e.bossId === "godzilla" ? 48 : 16); }
+function bossGridW(e){ return e.bossId === "ship" ? 2 : e.bossId === "godzilla" ? 3 : 1; }
+function bossGridH(e){ return e.bossId === "ship" ? 2 : e.bossId === "godzilla" ? 3 : 1; }
+/* 坦克碰撞矩形：玩家碰撞模型缩小为 24×24（中心对齐）；Boss 按各自体型 */
+const PLAYER_HALF = 12;
+function tankRect(t){
+  if(t.isPlayer){
+    return { x: t.x + 16 - PLAYER_HALF, y: t.y + 16 - PLAYER_HALF, w: PLAYER_HALF*2, h: PLAYER_HALF*2 };
+  }
+  if(t.isBoss) return { x: t.x, y: t.y, w: bossW(t), h: bossH(t) };
+  return { x: t.x, y: t.y, w: CELL, h: CELL };
+}
+function tryMove(t, dx, dy, dt){
+  if(t.isPlayer && t.skillActive > 0 && t.skillType === "ram") smashAhead(t, dx, dy);
+  const max = currentSpeed(t);                        // 目标速度（含地形/技能/升级加成）
+  // 取消线性加减速：速度瞬时达到目标值，松开立即停止
+  t.vx = dx * max;
+  t.vy = dy * max;
+  const r = tankRect(t);                              // 当前碰撞矩形
+  const ox = r.x - t.x, oy = r.y - t.y;               // 碰撞矩形相对左上角偏移
+  const ig = !!t.isBoss;                              // Boss 移动无视普通坦克阻挡
+  const segs = (t.isBoss && t.bossId === "train") ? t.segments : null;   // 车头不能穿过自己的车厢
+  let blocked = false;                                // 本帧是否被挡（撞墙/被堵），供敌方快速换向
+  if(t.vx !== 0){
+    const nx = t.x + t.vx*dt;
+    if(!rectBlocked(nx + ox, t.y + oy, r.w, r.h, t, ig) && !segBlock(segs, nx + ox, t.y + oy)){
+      t.x = nx;
+      t.mudAcc = (t.mudAcc || 0) + Math.abs(t.vx*dt);
+      if(t.mudAcc >= 10){ t.mudAcc = 0; spawnMud(t); }
+    } else {
+      blocked = true;
+      if(t.isPlayer && blockedByBoss(t)) destroyTank(t, t === game.player);   // 撞上 Boss：玩家损坏
+      t.x = t.x - t.vx*dt;                                  // 被挡即回退移动前位置，绝不跳变
+    }
+  }
+  if(t.vy !== 0){
+    const ny = t.y + t.vy*dt;
+    if(!rectBlocked(t.x + ox, ny + oy, r.w, r.h, t, ig) && !segBlock(segs, t.x + ox, ny + oy)){
+      t.y = ny;
+      t.mudAcc = (t.mudAcc || 0) + Math.abs(t.vy*dt);
+      if(t.mudAcc >= 10){ t.mudAcc = 0; spawnMud(t); }
+    } else {
+      blocked = true;
+      if(t.isPlayer && blockedByBoss(t)) destroyTank(t, t === game.player);
+      t.y = t.y - t.vy*dt;
+    }
+  }
+  // 防御性钳制：位置异常（NaN/出界）一律拉回地图内，杜绝卡死与穿界
+  if(!isFinite(t.x) || !isFinite(t.y)){ t.x = 4*CELL; t.y = 17*CELL; }
+  if(t.x < -4) t.x = -4; else if(t.x > CW - r.w + 4) t.x = CW - r.w + 4;
+  if(t.y < -4) t.y = -4; else if(t.y > CH - r.h + 4) t.y = CH - r.h + 4;
+  return blocked;
+}
+/* 列车车头目标矩形是否与自身车厢重叠（防止 180° 掉头穿车厢；2px 容错避免相邻车厢误判） */
+function segBlock(segs, x, y){
+  if(!segs) return false;
+  for(const s of segs){
+    if(x < s.x + 30 && x + 30 > s.x && y < s.y + 30 && y + 30 > s.y) return true;
+  }
+  return false;
+}
+/* 车厢目标位置是否与车头/其他车厢重叠（自身除外；2px 容错） */
+function segOverlapOthers(e, skipIdx, x, y){
+  const list = [{x:e.x, y:e.y}].concat(e.segments);
+  for(let k=0; k<list.length; k++){
+    if(k === skipIdx + 1) continue;      // skipIdx 对应 segments 下标，list 里是 skipIdx+1
+    if(x < list[k].x + 30 && x + 30 > list[k].x && y < list[k].y + 30 && y + 30 > list[k].y) return true;
+  }
+  return false;
+}
+/* 玩家碰撞矩形扩张 2px 是否与 Boss（含列车车厢）接触：碰撞即损坏 */
+function blockedByBoss(t){
+  const r = tankRect(t), ext = 2;
+  const rx = r.x - ext, ry = r.y - ext, rw = r.w + ext*2, rh = r.h + ext*2;
+  for(const e of game.enemies){
+    if(e.dead || !e.isBoss) continue;
+    if(rx < e.x+bossW(e) && rx+rw > e.x && ry < e.y+bossH(e) && ry+rh > e.y) return true;
+    for(const seg of (e.segments || [])){
+      if(rx < seg.x+32 && rx+rw > seg.x && ry < seg.y+32 && ry+rh > seg.y) return true;
+    }
+  }
+  return false;
+}
+
+/* ================= 音效与背景音乐（Web Audio 程序化合成，无外部文件） ================= */
+const SND = {
+  ctx:null, master:null, sfxGain:null, bgmGain:null,
+  bgmMode:null, bgmTimer:null, bgmStep:0, ok:false,
+  init(){
+    if(this.ctx){ this.resume(); return; }
+    try{
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(!AC) return;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain(); this.master.gain.value = 0.55; this.master.connect(this.ctx.destination);
+      this.sfxGain = this.ctx.createGain(); this.sfxGain.gain.value = 0.5; this.sfxGain.connect(this.master);
+      this.bgmGain = this.ctx.createGain(); this.bgmGain.gain.value = 0.11; this.bgmGain.connect(this.master);
+      this.ok = true;
+      this.applyVols();                            // 应用用户音量设置
+    }catch(e){ this.ok = false; }
+  },
+  /* 音量控制（0-100）：实时更新增益，并持久化到 settings */
+  setSfxVol(v){
+    settings.sfxVol = Math.max(0, Math.min(100, v));
+    saveSettings();
+    if(this.ok && this.sfxGain) this.sfxGain.gain.value = 0.5 * (settings.sfxVol / 100);
+  },
+  setBgmVol(v){
+    settings.bgmVol = Math.max(0, Math.min(100, v));
+    saveSettings();
+    if(this.ok && this.bgmGain) this.bgmGain.gain.value = 0.11 * (settings.bgmVol / 100);
+  },
+  applyVols(){
+    if(!this.ok || !this.sfxGain || !this.bgmGain) return;
+    this.sfxGain.gain.value = 0.5 * (settings.sfxVol / 100);
+    this.bgmGain.gain.value = 0.11 * (settings.bgmVol / 100);
+  },
+  resume(){ if(this.ctx && this.ctx.state === "suspended") this.ctx.resume().catch(()=>{}); },
+  now(){ return this.ctx ? this.ctx.currentTime : 0; },
+  /* 基础音：音调振荡器 */
+  tone(f, t0, dur, type, vol, slideTo){
+    if(!this.ok) return;
+    try{
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = type || "square"; o.frequency.setValueAtTime(Math.max(20, f), t0);
+      if(slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), t0 + dur);
+      g.gain.setValueAtTime(vol, t0);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+      o.connect(g); g.connect(this.sfxGain);
+      o.start(t0); o.stop(t0 + dur + 0.03);
+    }catch(e){}
+  },
+  /* 基础音：衰减噪声（爆炸/履带） */
+  noise(t0, dur, vol, lp){
+    if(!this.ok) return;
+    try{
+      const n = Math.max(1, Math.floor(this.ctx.sampleRate * dur));
+      const buf = this.ctx.createBuffer(1, n, this.ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for(let i=0; i<n; i++) d[i] = (Math.random()*2 - 1) * (1 - i/n);
+      const src = this.ctx.createBufferSource(); src.buffer = buf;
+      const f = this.ctx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = lp || 1000;
+      const g = this.ctx.createGain(); g.gain.value = vol;
+      src.connect(f); f.connect(g); g.connect(this.sfxGain);
+      src.start(t0);
+    }catch(e){}
+  },
+  /* ===== 具体音效 ===== */
+  shootPlayer(){ if(!this.ok) return; const t = this.now(); this.tone(200, t, 0.13, "square", 0.5, 60); this.noise(t, 0.09, 0.4, 1600); },
+  shootEnemy(){ if(!this.ok) return; const t = this.now(); this.tone(150, t, 0.1, "sawtooth", 0.32, 55); this.noise(t, 0.06, 0.25, 1100); },
+  shootBoss(){ if(!this.ok) return; const t = this.now(); this.tone(110, t, 0.2, "sawtooth", 0.5, 40); this.noise(t, 0.16, 0.45, 750); },
+  laserBoss(){ if(!this.ok) return; const t = this.now(); this.tone(900, t, 0.4, "sawtooth", 0.4, 180); this.noise(t, 0.2, 0.3, 2000); },
+  moveTick(){ if(!this.ok) return; this.noise(this.now(), 0.06, 0.12, 550); },
+  skillOverdrive(){ if(!this.ok) return; const t = this.now(); this.tone(240, t, 0.5, "sawtooth", 0.3, 900); },
+  skillLoop(){ if(!this.ok) return; this.tone(80, this.now(), 0.16, "square", 0.14); },
+  positron(){ if(!this.ok) return; const t = this.now(); this.tone(1400, t, 0.5, "sawtooth", 0.35, 180); this.noise(t, 0.3, 0.25, 3000); },
+  skillRam(){ if(!this.ok) return; const t = this.now(); this.tone(160, t, 0.45, "square", 0.4, 45); this.noise(t, 0.3, 0.35, 900); },
+  hitPlayer(){ if(!this.ok) return; const t = this.now(); this.tone(650, t, 0.16, "square", 0.4, 180); },
+  hitEnemy(){ if(!this.ok) return; const t = this.now(); this.tone(500, t, 0.1, "square", 0.3, 150); },
+  hitBoss(){ if(!this.ok) return; const t = this.now(); this.tone(300, t, 0.22, "sawtooth", 0.42, 75); this.noise(t, 0.12, 0.3, 900); },
+  boomEnemy(){ if(!this.ok) return; const t = this.now(); this.noise(t, 0.42, 0.55, 700); this.tone(130, t, 0.4, "square", 0.45, 35); },
+  boomBoss(){ if(!this.ok) return; const t = this.now(); this.noise(t, 0.85, 0.75, 500); this.tone(85, t, 0.85, "square", 0.6, 25); },
+  boomPlayer(){ if(!this.ok) return; const t = this.now(); this.noise(t, 0.5, 0.6, 600); this.tone(150, t, 0.5, "sawtooth", 0.5, 35); },
+  boomBomb(){ if(!this.ok) return; const t = this.now(); this.noise(t, 0.65, 0.65, 500); this.tone(100, t, 0.65, "square", 0.55, 30); },
+  barrierBreak(){ if(!this.ok) return; const t = this.now(); this.noise(t, 0.2, 0.42, 2400); this.tone(1500, t, 0.1, "square", 0.24); this.tone(950, t + 0.05, 0.14, "square", 0.2); this.tone(620, t + 0.1, 0.12, "square", 0.16); },
+  alarm(){ if(!this.ok) return; const t = this.now(); this.tone(820, t, 0.16, "square", 0.28); this.tone(560, t + 0.18, 0.16, "square", 0.28); },
+  win(){ if(!this.ok) return; const t = this.now(); const seq = [523, 659, 784, 1047]; seq.forEach((f, i) => this.tone(f, t + i*0.13, i === 3 ? 0.4 : 0.12, "square", 0.3)); },
+  lose(){ if(!this.ok) return; const t = this.now(); [330, 294, 262, 196].forEach((f, i) => this.tone(f, t + i*0.18, 0.25, "sawtooth", 0.3)); },
+  droneBuzz(){ if(!this.ok) return; this.tone(420 + Math.random()*120, this.now(), 0.12, "sawtooth", 0.1); },
+  /* ===== 背景音乐 ===== */
+  bgmStart(mode){
+    if(!this.ok) return;
+    if(this.bgmMode === mode) return;
+    this.bgmStop();
+    this.bgmMode = mode;
+    this.bgmStep = 0;
+    const seq = mode === "menu" ? [262, 330, 392, 494, 440, 392, 330, 262] : [131, 98, 131, 87, 98, 131, 165, 98];
+    const stepMs = mode === "menu" ? 430 : 235;
+    const playNext = () => {
+      if(this.bgmMode !== mode) return;
+      try{
+        const t = this.ctx.currentTime;
+        const f = seq[this.bgmStep % seq.length];
+        const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+        o.type = mode === "menu" ? "triangle" : "square";
+        o.frequency.value = f;
+        g.gain.setValueAtTime(0.6, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + (mode === "menu" ? 0.55 : 0.28));
+        o.connect(g); g.connect(this.bgmGain);
+        o.start(t); o.stop(t + 0.6);
+      }catch(e){}
+      this.bgmStep++;
+      this.bgmTimer = setTimeout(playNext, stepMs);
+    };
+    playNext();
+  },
+  bgmStop(){ if(this.bgmTimer){ clearTimeout(this.bgmTimer); this.bgmTimer = null; } this.bgmMode = null; }
+};
+
+/* ================= 效果 ================= */
+function addEffect(type, x, y, dur){
+  const ef = { type, x, y, t: 0, dur };
+  if(type === "brick"){
+    ef.parts = [];
+    for(let i=0; i<6; i++){
+      ef.parts.push({ dx: Math.cos(i*1.047)*0.6 + (Math.random()-.5)*0.5, dy: Math.sin(i*1.047)*0.6 + (Math.random()-.5)*0.5 });
+    }
+  } else if(type === "spark"){ // 打击火花：向四周飞溅的碎片
+    ef.parts = [];
+    for(let i=0; i<8; i++){
+      const a = Math.random()*Math.PI*2;
+      ef.parts.push({
+        dx: Math.cos(a)*(0.7+Math.random()*1.1),
+        dy: Math.sin(a)*(0.7+Math.random()*1.1),
+        c: Math.random()<0.3 ? "#fff" : (Math.random()<0.5 ? "#ffd54d" : "#ff8a3d")
+      });
+    }
+  } else if(type === "barrierBreak"){ // 装甲屏障碎裂：深浅蓝色护盾碎片四散
+    ef.parts = [];
+    for(let i=0; i<14; i++){
+      const a = Math.random()*Math.PI*2;
+      ef.parts.push({
+        dx: Math.cos(a)*(1 + Math.random()*1.5),
+        dy: Math.sin(a)*(1 + Math.random()*1.5),
+        s: 3 + Math.random()*4,
+        c: Math.random()<0.35 ? "#cfe2fa" : (Math.random()<0.55 ? "#7fb2e8" : "#3f6ea5")
+      });
+    }
+  } else {
+    ef.seed = Math.random()*100;
+  }
+  game.effects.push(ef);
+  return ef;
+}
+/* 坦克移动扬尘/水花/泥浆 */
+function spawnMud(t){
+  const {c, r} = cellOf(t);
+  const v = game.map[r][c];
+  if(v === 2 || v === 3 || v >= 8) return;                 // 钢/大本营/铁墙：无扬尘
+  const kind = v === 6 ? "water" : (v === 5 ? "swamp" : "dirt");
+  const [dx, dy] = DIRS[t.dir];
+  const ef = { type:"mud", x: t.x+16, y: t.y+16, t:0, dur:0.4, parts:[] };
+  const n = kind === "water" ? 3 : 2;
+  for(let i=0; i<n; i++){
+    ef.parts.push({
+      dx: -dx*(0.4+Math.random()*0.7) + (Math.random()-0.5)*0.8,
+      dy: -dy*(0.4+Math.random()*0.7) + (Math.random()-0.5)*0.8,
+      c: kind === "water" ? (Math.random()<0.5 ? "#7ec8e3" : "#b7e3f5")
+         : kind === "swamp" ? (Math.random()<0.5 ? "#4a3b28" : "#5d4a33")
+         : (Math.random()<0.5 ? "#7a5a33" : "#8d6a3d")
+    });
+  }
+  game.effects.push(ef);
+}
+
+/* ================= 炮弹 ================= */
+function fireBullet(t, owner){
+  const [dx, dy] = DIRS[t.dir];
+  const n = 1 + (owner === "player" || owner === "player2" ? game.buffs.multishot : 0); // 双炮管
+  const ammo = t.ammo || "normal";
+  for(let i=0; i<n; i++){
+    const off = (i - (n-1)/2) * 16;                                // 前后间隔0.5格=16px
+    const nb = {
+      x: t.x + 12 + dx*20 - dy*off,
+      y: t.y + 12 + dy*20 + dx*off,
+      dx, dy, owner, dead: false,
+      ammo, speed: BULLET_SPEED, pierce: 0
+    };
+    if(ammo === "apfsds"){ nb.speed = BULLET_SPEED*2; nb.pierce = 1; } // 穿甲弹：2倍速、可穿透1个目标
+    game.bullets.push(nb);
+  }
+  if(owner === "player" || owner === "player2") SND.shootPlayer(); else SND.shootEnemy();
+}
+function hitZone(sdx, sdy, tank){
+  const [fdx, fdy] = DIRS[tank.dir];
+  const dot = sdx*fdx + sdy*fdy;
+  if(dot < 0) return "front";
+  if(dot > 0) return "back";
+  return "side";
+}
+function updateBullets(dt){
+  const g = game;
+  for(const b of g.bullets){
+    if(b.dead) continue;
+    b.x += b.dx * (b.speed || BULLET_SPEED) * dt;
+    b.y += b.dy * (b.speed || BULLET_SPEED) * dt;
+    if(b.x < -4 || b.x > CW-4 || b.y < -4 || b.y > CH-4){ b.dead = true; continue; }
+    const cc = Math.floor((b.x + 4) / CELL), cr = Math.floor((b.y + 4) / CELL);
+    if(cc < 0 || cc >= COLS || cr < 0 || cr >= ROWS){ b.dead = true; continue; }
+    const cell = g.map[cr][cc];
+    if(cell === 1){
+      g.map[cr][cc] = 0;
+      addEffect("brick", cc*CELL+16, cr*CELL+16, 0.5);
+      addEffect("spark", b.x+4, b.y+4, 0.2);
+      if(b.ammo === "apfsds"){                    // 穿甲弹：穿透砖块（最多 1 个）
+        b.pierce--; if(b.pierce < 0) b.dead = true;
+      } else {
+        if(b.ammo === "he") heBlast(cc, cr);      // 榴弹：命中砖块即爆炸
+        b.dead = true;
+      }
+      continue;
+    }
+    if(cell === 2){
+      addEffect("spark", b.x+4, b.y+4, 0.18);
+      if(b.ammo === "he") heBlast(cc, cr);
+      b.dead = true; continue;
+    }
+    if(cell === 3){ destroyBase(); b.dead = true; continue; }
+    if(cell >= 8 && cell <= 10){ // 铁制护墙：可挡3发
+      if(cell - 1 <= 7) g.map[cr][cc] = 0; else g.map[cr][cc] = cell - 1;
+      addEffect("spark", b.x+4, b.y+4, 0.18);
+      b.dead = true; continue;
+    }
+    // 草丛/沼泽/水：炮弹穿过
+    if(b.owner === "player"){
+      for(const e of g.enemies){
+        if(e.dead) continue;
+        if(e.isBoss){
+          let hit = false;
+          const bdmg = b.ammo === "apfsds" ? 2 : 1;      // 穿甲弹对 Boss 伤害 2 倍但不可穿透
+          if(e.bossId === "train"){
+            if(b.x < e.x+32 && b.x+8 > e.x && b.y < e.y+32 && b.y+8 > e.y){ damageBoss(e, bdmg); hit = true; }
+            else {
+              for(let i=e.segments.length-1; i>=0; i--){
+                const seg = e.segments[i];
+                if(b.x < seg.x+32 && b.x+8 > seg.x && b.y < seg.y+32 && b.y+8 > seg.y){
+                  seg.hp -= bdmg;
+                  if(seg.hp <= 0) removeTrainSeg(e, seg);
+                  else addEffect("spark", b.x+4, b.y+4, 0.18);
+                  hit = true; break;
+                }
+              }
+            }
+          } else {
+            if(b.x < e.x+bossW(e) && b.x+8 > e.x && b.y < e.y+bossH(e) && b.y+8 > e.y){
+              if(e.bossId === "godzilla" && e.shieldT > 0){ reflectBullet(b, e); break; }   // 护盾反射
+              damageBoss(e, bdmg); hit = true;
+            }
+          }
+          if(hit){ if(b.ammo === "he") heBlast(cc, cr); b.dead = true; break; }
+        } else {
+          if(b.x < e.x+CELL && b.x+8 > e.x && b.y < e.y+CELL && b.y+8 > e.y){
+            e.hp -= (b.ammo === "apfsds" ? 2 : 1);   // 穿甲弹伤害 2 倍
+            if(e.hp <= 0) killEnemy(e, b.owner === "player2" ? "player2" : "player");
+            else { addEffect("spark", b.x+4, b.y+4, 0.18); SND.hitEnemy(); }
+            if(b.ammo === "he"){ heBlast(cc, cr); b.dead = true; }
+            else if(b.ammo === "apfsds"){
+              b.pierce--; if(b.pierce < 0) b.dead = true;   // 穿甲弹：穿透 1 个敌人
+            } else b.dead = true;
+            break;
+          }
+        }
+      }
+    } else {
+      const tanks = g.player2 ? [g.player, g.player2] : [g.player];
+      for(const p of tanks){
+        if(p.dead) continue;
+        if(b.x < p.x+CELL && b.x+8 > p.x && b.y < p.y+CELL && b.y+8 > p.y){
+          if(p.inv <= 0) damageTank(p, hitZone(b.dx, b.dy, p));
+          else addEffect("spark", b.x+4, b.y+4, 0.18);
+          b.dead = true;
+          break;
+        }
+      }
+    }
+    if(!b.dead){
+      for(const o of g.bullets){
+        if(o.dead || o === b || o.owner === b.owner) continue;
+        const bF = (b.owner === "player" || b.owner === "player2");
+        const oF = (o.owner === "player" || o.owner === "player2");
+        if(bF === oF) continue;                  // 双人：玩家阵营内部炮弹互不抵消
+        if(b.x < o.x+8 && b.x+8 > o.x && b.y < o.y+8 && b.y+8 > o.y){
+          b.dead = true; o.dead = true;
+          addEffect("spark", (b.x+o.x)/2+4, (b.y+o.y)/2+4, 0.2);
+          break;
+        }
+      }
+    }
+  }
+}
+
+/* 榴弹爆炸：命中后造成 1 级定时炸弹的爆炸范围伤害（3×3） */
+function heBlast(cx, cy){
+  for(let dr=-1; dr<=1; dr++){
+    for(let dc=-1; dc<=1; dc++){
+      const c = cx+dc, r = cy+dr;
+      if(c < 0 || c >= COLS || r < 0 || r >= ROWS) continue;
+      if(game.map[r][c] === 1) game.map[r][c] = 0;
+      const bx = c*CELL, by = r*CELL;
+      for(const e of [].concat(game.enemies)){
+        if(e.dead) continue;
+        if(e.isBoss){
+          if(e.bossId === "train"){
+            // 列车：车头 32×32 判定，否则遍历车厢
+            if(bx < e.x+32 && bx+32 > e.x && by < e.y+32 && by+32 > e.y) damageBoss(e, 1);
+            else if(e.segments){
+              for(const seg of e.segments){
+                if(bx < seg.x+32 && bx+32 > seg.x && by < seg.y+32 && by+32 > seg.y){
+                  seg.hp--; if(seg.hp <= 0) removeTrainSeg(e, seg);
+                  else addEffect("spark", bx+16, by+16, 0.3);
+                  break;
+                }
+              }
+            }
+          } else {
+            // 其他 Boss（战舰 2×2 / 哥斯拉 3×3）按完整体型判定；无车厢
+            if(bx < e.x+bossW(e) && bx+32 > e.x && by < e.y+bossH(e) && by+32 > e.y) damageBoss(e, 1);
+          }
+        } else if(bx < e.x+32 && bx+32 > e.x && by < e.y+32 && by+32 > e.y){
+          killEnemy(e, "player");
+        }
+      }
+    }
+  }
+  const ef = addEffect("boom", cx*CELL+16, cy*CELL+16, 0.7);
+  if(ef) ef.big = 2;
+  SND.boomBomb();
+}
+
+/* ================= 玩家 ================= */
+function damageTank(p, zone){
+  if(p.dead || p.inv > 0) return;
+  p.killStreak = 0; if(p === game.player) game.streak = 0;   // 被击中断连击
+  game.shake = 0.3;                                   // 画面抖动
+  SND.hitPlayer();
+  if(game.buffs.barrier){                            // 装甲屏障：挡1发（碎裂特效+音效）
+    game.buffs.barrier = false;
+    addEffect("barrierBreak", p.x+16, p.y+16, 0.55);
+    SND.barrierBreak();
+    updateHUD();
+    return;
+  }
+  if(zone === "front"){
+    if(p.armor.front > 0){ p.armor.front--; addEffect("spark", p.x+16, p.y+16, 0.2); updateHUD(); return; }
+  } else {
+    if(p.armor.side > 0){ p.armor.side--; addEffect("spark", p.x+16, p.y+16, 0.2); updateHUD(); return; }
+  }
+  destroyTank(p);
+}
+function damagePlayer(zone){ damageTank(game.player, zone); }
+/* 振动反馈（需设备支持，设置中可关） */
+function doVibrate(ms){
+  if(settings.vibrate && navigator.vibrate){ try{ navigator.vibrate(ms); }catch(e){} }
+}
+function destroyTank(p){
+  p.dead = true;
+  p.respawn = 1.0;
+  p.killStreak = 0; if(p === game.player) game.streak = 0;
+  p.level = 0;                                       // 被击毁后重置等级
+  addEffect("boom", p.x+16, p.y+16, 0.6);
+  game.shake = 0.45;
+  SND.boomPlayer();
+  doVibrate(120);
+  // 有限重生次数：死亡即扣除 1 次（双人共享重生池）
+  if(LIVES_MAX[settings.lives] !== Infinity && game.livesLeft > 0) game.livesLeft--;
+  updateHUD();
+}
+function destroyPlayer(){ destroyTank(game.player); }
+function respawnTank(p){
+  // 重生次数用尽 → 游戏结束
+  if(game.livesLeft <= 0){
+    game.state = "over";
+    game.overType = "lose";
+    game.baseAlive = false;
+    showOverlay("lose");
+    ovSub.textContent = "重生次数已用尽！";
+    SND.lose();
+    clearSave();
+    return;
+  }
+  const isP1 = p === game.player;
+  // 出生位选择：P1 底部 (4,17)，P2 顶部对称 (4,1)；被占据则就近选空位
+  const spots = isP1
+    ? [[4,17],[5,17],[3,17],[4,16],[5,16],[3,16],[6,17],[2,17]]
+    : [[4,1],[5,1],[3,1],[4,2],[5,2],[3,2],[6,1],[2,1]];
+  let sx = 4*CELL, sy = isP1 ? 17*CELL : 1*CELL;
+  for(const [cc, rr] of spots){
+    const x = cc*CELL, y = rr*CELL;
+    if(cellWalkable(cc, rr, "player", p.tankType) && !rectHasTank(x, y, CELL, CELL, p)){ sx = x; sy = y; break; }
+  }
+  p.x = sx; p.y = sy; p.dir = isP1 ? 0 : 2;
+  p.dead = false; p.respawn = 0; p.inv = 1.5; p.fireCd = 0;
+  p.vx = 0; p.vy = 0;
+  applyArmor(p);
+  // 出生点若被普通敌方坦克占据，将敌人弹开到附近空地，避免重叠（Boss 无法弹开，靠换位规避）
+  const rp = tankRect(p);
+  for(const e of game.enemies){
+    if(e.dead || e.isBoss) continue;
+    const re = tankRect(e);
+    if(rp.x < re.x + re.w && rp.x + rp.w > re.x && rp.y < re.y + re.h && rp.y + rp.h > re.y){
+      pushEnemyAway(e, p);
+    }
+  }
+  updateHUD();
+}
+function respawnPlayer(){ respawnTank(game.player); }
+function updateTank(p, keys, dt, owner){
+  p.fireCd -= dt;
+  if(p.inv > 0) p.inv -= dt;
+  if(p.skillCd > 0) p.skillCd -= dt;
+  if(p.skillActive > 0) p.skillActive -= dt;
+  if(p.dead){
+    p.respawn -= dt;
+    if(p.respawn <= 0) respawnTank(p);
+    return;
+  }
+  let dx = 0, dy = 0;
+  // 只响应最后按下的移动键：上下左右四向独立移动，杜绝斜向向量叠加
+  for(let i = pressOrder.length - 1; i >= 0; i--){
+    const code = pressOrder[i];
+    if(code === keys.up){ dy = -1; break; }
+    if(code === keys.down){ dy = 1; break; }
+    if(code === keys.left){ dx = -1; break; }
+    if(code === keys.right){ dx = 1; break; }
+  }
+  if(dx !== 0 || dy !== 0){
+    p.dir = (dy === -1) ? 0 : (dx === 1) ? 1 : (dy === 1) ? 2 : 3;
+  }
+  const prevX = p.x, prevY = p.y;
+  tryMove(p, dx, dy, dt);                              // 无输入时也调用：速度瞬时归零停止
+  if((p.x !== prevX || p.y !== prevY) && (dx !== 0 || dy !== 0)){
+    p.moveSnd -= dt;
+    if(p.moveSnd <= 0){ p.moveSnd = 0.18; SND.moveTick(); }
+  }
+  if(pressed[keys.fire] && p.fireCd <= 0){
+    fireBullet(p, owner);
+    p.fireCd = fireInterval(p);
+  }
+}
+function drawPlayerUnit(p){
+  const g = game;
+  if(!p.dead && !(p.inv > 0 && Math.floor(p.inv * 10) % 2 === 0)){
+    drawSprite(ctx, spriteFor(PLAYER_SPRITE_KEY[p.tankType], p.dir), p.x, p.y, 2, TANK_PALS[p.tankType]);
+    // 升级星级：坦克左上角五角星，升一级加一颗（最多 3 颗）
+    if(p.level > 0){
+      for(let i=0; i<p.level; i++){
+        drawStar(ctx, p.x + 2 + i*8, p.y + 2, 6);
+      }
+    }
+    // 炮弹装填进度条（黄色，坦克上方）
+    if(p.fireCd > 0){
+      const fint = fireInterval(p);
+      const prog = Math.max(0, Math.min(1, 1 - p.fireCd / fint));
+      const bw = 28, bh = 4, bx = p.x + 2, by = p.y - 10;
+      ctx.fillStyle = "rgba(0,0,0,.8)";
+      ctx.fillRect(bx - 1, by - 1, bw + 2, bh + 2);
+      ctx.fillStyle = "#3a3f46";
+      ctx.fillRect(bx, by, bw, bh);
+      ctx.fillStyle = "#ffd54d";
+      ctx.fillRect(bx, by, Math.round(bw * prog), bh);
+    }
+    // 装甲屏障局内特效：半透明淡蓝护盾罩（呼吸脉动，覆盖坦克边缘）
+    if(g.buffs.barrier){
+      const bt = performance.now() / 1000;
+      const pulse = 1 + Math.sin(bt * 4.2) * 0.07;
+      const sz = 21 * pulse;
+      const ox = p.x + 16, oy = p.y + 16;
+      ctx.globalAlpha = 0.22 + Math.sin(bt * 4.2) * 0.05;
+      ctx.fillStyle = "#6fc3ff";
+      ctx.beginPath();
+      ctx.moveTo(ox - sz, oy - sz*0.55);
+      ctx.lineTo(ox - sz*0.55, oy - sz);
+      ctx.lineTo(ox + sz*0.55, oy - sz);
+      ctx.lineTo(ox + sz, oy - sz*0.55);
+      ctx.lineTo(ox + sz, oy + sz*0.55);
+      ctx.lineTo(ox + sz*0.55, oy + sz);
+      ctx.lineTo(ox - sz*0.55, oy + sz);
+      ctx.lineTo(ox - sz, oy + sz*0.55);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 0.5;
+      ctx.strokeStyle = "#a8dcff";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // 护盾内淡色十字纹理
+      ctx.globalAlpha = 0.18;
+      ctx.fillStyle = "#cfe2fa";
+      ctx.fillRect(ox - 3, oy - sz + 4, 2, sz*2 - 8);
+      ctx.fillRect(ox - sz + 4, oy - 3, sz*2 - 8, 2);
+      ctx.globalAlpha = 1;
+    }
+    // 基础技能冷却进度条（青色，坦克下方；激活时紫色）
+    if(p.skillCd > 0 || p.skillActive > 0){
+      const smax = SKILL_INFO[p.skillType].cd;
+      const sprog = p.skillActive > 0 ? 1 : Math.max(0, Math.min(1, 1 - p.skillCd / smax));
+      const bw = 28, bh = 4, bx = p.x + 2, by = p.y + 34;
+      ctx.fillStyle = "rgba(0,0,0,.8)";
+      ctx.fillRect(bx - 1, by - 1, bw + 2, bh + 2);
+      ctx.fillStyle = "#3a3f46";
+      ctx.fillRect(bx, by, bw, bh);
+      ctx.fillStyle = p.skillActive > 0 ? "#b388ff" : "#4dd0ff";
+      ctx.fillRect(bx, by, Math.round(bw * sprog), bh);
+    }
+  }
+}
+
+function updatePlayer(dt){
+  updateTank(game.player, settings.keys, dt, "player");
+  if(game.player2) updateTank(game.player2, settings.keys2, dt, "player2");
+}
+
+/* ================= 技能 ================= */
+function useSkill(p){
+  p = p || game.player;
+  if(!game || game.state !== "playing" || p.dead) return;
+  if(p.skillCd > 0 || p.skillActive > 0) return;
+  const st = p.skillType;
+  if(st === "overdrive"){                       // 引擎过载
+    p.skillActive = 5; p.skillCd = 15;
+    addEffect("spawn", p.x+16, p.y+16, 0.6);
+    SND.skillOverdrive();
+  } else if(st === "positron"){                 // 阳电子炮
+    fireLaser(p);
+    p.skillCd = 20;
+    SND.positron();
+  } else if(st === "ram"){                      // 冲撞碾压
+    p.skillActive = 8; p.skillCd = 15;
+    addEffect("spark", p.x+16, p.y+16, 0.5);
+    SND.skillRam();
+  }
+  updateHUD();
+}
+function fireLaser(p){
+  p = p || game.player;
+  const [dx, dy] = DIRS[p.dir];
+  const c0 = Math.floor((p.x + 16) / CELL), r0 = Math.floor((p.y + 16) / CELL);
+  for(let k=1; k<19; k++){
+    const c = c0 + dx*k, r = r0 + dy*k;
+    if(c < 0 || c >= COLS || r < 0 || r >= ROWS) break;
+    if(game.map[r][c] === 1){ game.map[r][c] = 0; addEffect("brick", c*CELL+16, r*CELL+16, 0.4); }
+    for(const e of game.enemies){
+      if(e.dead) continue;
+      if(e.isBoss){
+        // 阳电子炮对 Boss 伤害计为 3 炮；一轮激光对同一 Boss 只结算一次
+        if(e._laserHit) continue;
+        if(e.bossId === "ship" || e.bossId === "godzilla"){
+          const egc = Math.floor(e.x / CELL), egr = Math.floor(e.y / CELL);
+          if(c >= egc && c < egc + bossGridW(e) && r >= egr && r < egr + bossGridH(e)){
+            e._laserHit = true;
+            damageBoss(e, 3);
+          }
+        } else if(e.bossId === "train"){
+          const hc = Math.floor((e.x + 16) / CELL), hr = Math.floor((e.y + 16) / CELL);
+          if(c === hc && r === hr){ e._laserHit = true; damageBoss(e, 3); }
+          else {
+            for(const seg of e.segments){
+              if(c === Math.floor((seg.x + 16) / CELL) && r === Math.floor((seg.y + 16) / CELL)){
+                e._laserHit = true;
+                seg.hp -= 3;
+                if(seg.hp <= 0) removeTrainSeg(e, seg);
+                else addEffect("spark", c*CELL+16, r*CELL+16, 0.3);
+                break;
+              }
+            }
+          }
+        }
+      } else {
+        if(Math.floor((e.x + 16) / CELL) === c && Math.floor((e.y + 16) / CELL) === r) killEnemy(e);
+      }
+    }
+  }
+  for(const e of game.enemies) if(e.isBoss) e._laserHit = false;
+  game.laser = { dir: p.dir, c: c0, r: r0, t: 0 };
+  addEffect("spark", c0*CELL+16, r0*CELL+16, 0.3);
+}
+
+/* ================= 定时炸弹 ================= */
+function deployBomb(p){
+  p = p || game.player;
+  if(!game || game.state !== "playing" || p.dead) return;
+  if(game.buffs.bomb < 1) return;
+  const {c, r} = cellOf(p);
+  game.bombs.push({ cx: c, cy: r, level: game.buffs.bomb, t: 0 });
+  addEffect("spark", c*CELL+16, r*CELL+16, 0.3);
+  updateHUD();
+}
+/* 炸弹是否被敌方/Boss 碰到（矩形碰撞；含列车车头/车厢、战舰 64×64） */
+function bombTouched(bm){
+  const bx = bm.cx*CELL, by = bm.cy*CELL;
+  for(const e of game.enemies){
+    if(e.dead) continue;
+    if(e.isBoss){
+      if(bx < e.x+bossW(e) && bx+32 > e.x && by < e.y+bossH(e) && by+32 > e.y) return true;
+      for(const seg of (e.segments || [])){
+        if(bx < seg.x+32 && bx+32 > seg.x && by < seg.y+32 && by+32 > seg.y) return true;
+      }
+    } else {
+      if(bx < e.x+32 && bx+32 > e.x && by < e.y+32 && by+32 > e.y) return true;
+    }
+  }
+  return false;
+}
+function explodeBomb(bm){
+  if(bm.isBoss){
+    // Boss 抛洒的炸弹：爆炸范围为炸弹周围一圈的格子（3×3 周边 8 格）；
+    // 哥斯拉定时炸弹：落点中心格同样爆炸（炸弹安置在玩家所在方格，躲不开就挨炸）
+    for(let dr=-1; dr<=1; dr++){
+      for(let dc=-1; dc<=1; dc++){
+        if(!bm.godzilla && dr === 0 && dc === 0) continue;
+        const c = bm.cx + dc, r = bm.cy + dr;
+        if(c < 0 || c >= COLS || r < 0 || r >= ROWS) continue;
+        if(game.map[r][c] === 1) game.map[r][c] = 0;
+        for(const pl of (game.player2 ? [game.player, game.player2] : [game.player])){
+          if(!pl.dead && pl.x+8 < c*CELL+32 && pl.x+24 > c*CELL && pl.y+8 < r*CELL+32 && pl.y+24 > r*CELL){
+            damageTank(pl, "side");
+          }
+        }
+        for(const e of [].concat(game.enemies)){
+          if(e.dead) continue;
+          if(e.isBoss){
+            if(e.x < c*CELL+32 && e.x+bossW(e) > c*CELL && e.y < r*CELL+32 && e.y+bossH(e) > r*CELL) damageBoss(e, 1);
+          } else if(e.x < c*CELL+32 && e.x+32 > c*CELL && e.y < r*CELL+32 && e.y+32 > r*CELL){
+            killEnemy(e);
+          }
+        }
+      }
+    }
+    const ef2 = addEffect("boom", bm.cx*CELL+16, bm.cy*CELL+16, 0.8);
+    if(ef2) ef2.big = 2;
+    SND.boomBomb();
+    return;
+  }
+  const rad = bm.level;
+  for(let dr=-rad; dr<=rad; dr++){
+    for(let dc=-rad; dc<=rad; dc++){
+      if(Math.abs(dr) + Math.abs(dc) > rad) continue;
+      const c = bm.cx + dc, r = bm.cy + dr;
+      if(c < 0 || c >= COLS || r < 0 || r >= ROWS) continue;
+      if(game.map[r][c] === 1) game.map[r][c] = 0;
+      const bx = c*CELL, by = r*CELL;
+      for(const e of [].concat(game.enemies)){
+        if(e.dead) continue;
+        if(e.isBoss){
+          if(e.bossId === "ship"){
+            if(bx < e.x+64 && bx+32 > e.x && by < e.y+64 && by+32 > e.y) damageBoss(e, 1);
+          } else {
+            if(bx < e.x+32 && bx+32 > e.x && by < e.y+32 && by+32 > e.y) damageBoss(e, 1);
+            else {
+              for(const seg of e.segments){
+                if(bx < seg.x+32 && bx+32 > seg.x && by < seg.y+32 && by+32 > seg.y){
+                  seg.hp--;
+                  if(seg.hp <= 0) removeTrainSeg(e, seg);
+                  else addEffect("spark", bx+16, by+16, 0.3);
+                  break;
+                }
+              }
+            }
+          }
+        } else if(bx < e.x+32 && bx+32 > e.x && by < e.y+32 && by+32 > e.y){
+          killEnemy(e);
+        }
+      }
+    }
+  }
+  const ef = addEffect("boom", bm.cx*CELL+16, bm.cy*CELL+16, 0.8);
+  if(ef) ef.big = bm.level;      // 三阶段爆炸特效：1/2/3 级不同范围
+  SND.boomBomb();
+}
+
+/* ================= 无人机（增益卡牌，Lv1-3） ================= */
+function updateDrone(d, dt){
+  d.t += dt;
+  if(d.phase === "idle" && d.t >= 1){ d.phase = "fly"; d.t = 0; }   // 原地停顿 1 秒再起飞
+  if(d.phase !== "fly") return;
+  // 目标：距离玩家最近的敌方单位（无视地形直线飞行）
+  let target = null, best = 1e9;
+  const px = game.player.x + 16, py = game.player.y + 16;
+  for(const e of game.enemies){
+    if(e.dead) continue;
+    const ex = bossCX(e), ey = bossCY(e);
+    const dist = Math.hypot(ex - px, ey - py);
+    if(dist < best){ best = dist; target = e; }
+  }
+  if(!target){ d.dead = true; return; }                          // 场上无敌人 → 无人机消失（不启动重生）
+  const tx = bossCX(target), ty = bossCY(target);
+  const cx = d.x + 8, cy = d.y + 8;
+  const dx = tx - cx, dy = ty - cy;
+  const dist = Math.hypot(dx, dy);
+  const step = 128 * dt;                                             // 1 秒 4 格
+  if(dist <= step + 8){                                              // 触碰目标 → 攻击
+    hitByDrone(d, target);
+    d.dead = true;
+    game.droneCd = game.buffs.drone >= 2 ? 0 : 5;                    // Lv2/3 立刻重生；Lv1 5 秒后重生
+    game.droneWait = true;
+    return;
+  }
+  d.x += dx / dist * step;
+  d.y += dy / dist * step;
+  d.vx = dx / dist; d.vy = dy / dist;
+  d.buzzT -= dt;
+  if(d.buzzT <= 0){ d.buzzT = 0.35; SND.droneBuzz(); }
+}
+function hitByDrone(d, e){
+  const dx = d.x + 8, dy = d.y + 8;
+  if(e.isBoss){
+    if(e.bossId !== "train"){
+      if(dx > e.x && dx < e.x + bossW(e) && dy > e.y && dy < e.y + bossH(e)) damageBoss(e, 1);
+      return;
+    }
+    // 列车：从尾部开始检查车厢，再命中车头
+    for(let i=e.segments.length-1; i>=0; i--){
+      const s = e.segments[i];
+      if(dx > s.x && dx < s.x + 32 && dy > s.y && dy < s.y + 32){
+        s.hp--;
+        if(s.hp <= 0) removeTrainSeg(e, s);
+        else addEffect("spark", s.x+16, s.y+16, 0.2);
+        return;
+      }
+    }
+    damageBoss(e, 1);
+    return;
+  }
+  e.hp--;
+  if(e.hp <= 0) killEnemy(e);
+  else { addEffect("spark", e.x+16, e.y+16, 0.2); SND.hitEnemy(); }
+}
+
+/* ================= 敌人 AI ================= */
+/* 按类型生成敌人：light 轻型 / quad 四向射手 / fast 疾行兵（始终 1 炮击杀） */
+const ENEMY_SPRITE_PALS = {
+  quad: enemyPal("#7fb2e8", "#3f6ea5", "#cfe2fa"),
+  fast: enemyPal("#e8837a", "#a34b42", "#f7c1bb")
+};
+function trySpawnEnemy(type){
+  const g = game;
+  type = type || "light";
+  if(g.concurrent >= MAX_CONCURRENT) return;
+  for(let i=0; i<10; i++){
+    const c = randInt(2, 16);
+    if(cellWalkable(c, 1, "enemy") && !rectHasTank(c*CELL, 1*CELL, CELL, CELL, null)){
+      const e = {
+        x: c*CELL, y: 1*CELL, dir: 2,
+        hp: type === "fast" ? 1 : DIFF_HP[settings.difficulty],   // fast 始终一炮击杀
+        speed: ENEMY_TYPES[type].speed,
+        vx: 0, vy: 0,
+        ai: 0.6 + Math.random()*0.4, fire: 1 + Math.random()*2,
+        spriteKey: type === "quad" ? "enemyQuad" : type === "fast" ? "enemyFast" : ENEMY_KEYS[settings.difficulty],
+        pal: ENEMY_SPRITE_PALS[type] || g.diffPal,
+        dead: false, etype: type
+      };
+      if(type === "fast") e.strafe = 0.6 + Math.random()*0.9;
+      g.enemies.push(e);
+      g.concurrent++;
+      addEffect("spawn", c*CELL+16, 1*CELL+16, 0.5);
+      return true;                              // 生成成功
+    }
+  }
+  return false;                                 // 出生位暂不可用
+}
+/* 方向 d 移动整格后矩形是否不被挡（含地形与坦克；与 tryMove 实际碰撞一致，杜绝"中心格可行但矩形被挡"卡住） */
+function dirFree32(e, d){
+  const [dx, dy] = DIRS[d];
+  const nx = e.x + dx*32, ny = e.y + dy*32;
+  const r = tankRect(e);
+  return !rectBlocked(nx, ny, r.w, r.h, e, false);
+}
+function aheadCellFree(e){
+  return dirFree32(e, e.dir);
+}
+function dirToward(e, tx, ty){
+  const ex = Math.floor((e.x + 16) / CELL), ey = Math.floor((e.y + 16) / CELL);
+  const ddx = tx - ex, ddy = ty - ey;
+  if(Math.abs(ddx) > Math.abs(ddy)) return ddx > 0 ? 1 : 3;
+  return ddy > 0 ? 2 : 0;
+}
+function chooseDir(e){
+  const pcx = Math.floor((game.player.x + 16) / CELL), pcy = Math.floor((game.player.y + 16) / CELL);
+  // 全部可行方向（矩形级验证：移动整格不被挡才算可行，避免选到实际撞墙的方向）
+  const opts = [];
+  for(let d=0; d<4; d++){
+    if(dirFree32(e, d)) opts.push(d);
+  }
+  const fail = e.lastFailDir;                     // 刚撞墙的方向：有替代方向时尽量避开，避免原地反复撞墙
+  const cands = [dirToward(e, pcx, pcy), dirToward(e, 9, 17), randInt(0,3)];
+  const seen = new Set();
+  for(const d of cands){
+    if(seen.has(d)) continue;
+    seen.add(d);
+    if(fail === d && opts.length > 1 && opts.indexOf(d) >= 0) continue;  // 还有别的路就不走刚失败方向
+    if(opts.indexOf(d) >= 0){ e.dir = d; return true; }
+  }
+  if(opts.length){ e.dir = opts[randInt(0, opts.length-1)]; return true; }
+  return false;                                   // 完全无路可走（调用方应立即瞬移脱困）
+}
+/* Boss 占用格检查（船 2×2，列车 1×1） */
+function bossCellFree(e, c, r){
+  if(c < 0 || c >= COLS || r < 0 || r >= ROWS) return false;
+  const gw = bossGridW(e), gh = bossGridH(e);
+  if(c + gw > COLS || r + gh > ROWS) return false;
+  for(let dr=0; dr<gh; dr++){
+    for(let dc=0; dc<gw; dc++){
+      if(!cellWalkable(c + dc, r + dr, "enemy")) return false;
+    }
+  }
+  return !rectHasTank(c*CELL, r*CELL, gw*CELL, gh*CELL, e);
+}
+/* Boss 移动：以横向随机为主（左右徘徊），偶尔纵向逼近玩家 */
+function bossChooseDir(e){
+  const ex = Math.floor((e.x + 16) / CELL), ey = Math.floor((e.y + 16) / CELL);
+  const pcy = Math.floor((game.player.y + 16) / CELL);
+  if(Math.random() < 0.62){
+    const order = Math.random() < 0.5 ? [1, 3] : [3, 1];       // 左/右随机优先
+    for(const d of order){
+      const [dx] = DIRS[d];
+      if(bossCellFree(e, ex + dx, ey)){ e.dir = d; return; }
+    }
+    const toward = pcy > ey ? 2 : 0;                            // 横向都堵 → 纵向逼近
+    for(const d of [toward, toward === 2 ? 0 : 2]){
+      const [dx, dy] = DIRS[d];
+      if(bossCellFree(e, ex + dx, ey + dy)){ e.dir = d; return; }
+    }
+  } else {
+    chooseDir(e);                                               // 40% 保留朝玩家/大本营寻路
+  }
+  const all = [];                                               // 兜底：任意可走方向
+  for(let d=0; d<4; d++){
+    const [dx, dy] = DIRS[d];
+    if(bossCellFree(e, ex + dx, ey + dy)) all.push(d);
+  }
+  if(all.length) e.dir = all[randInt(0, all.length-1)];
+}
+/* 防卡住：Boss 长时间不动则瞬移到附近开阔地（优先带出口的位置） */
+function bossTeleport(e){
+  for(let tries=0; tries<40; tries++){
+    const c = randInt(2, 15), r = randInt(1, 13);
+    if(!bossCellFree(e, c, r)) continue;
+    let exit = false;                                  // 目标格必须至少有一个可走出口
+    for(let d=0; d<4; d++){
+      const [dx, dy] = DIRS[d];
+      if(bossCellFree(e, c + dx, r + dy)){ exit = true; break; }
+    }
+    if(!exit) continue;
+    e.x = c*CELL; e.y = r*CELL;
+    e.lastDir = undefined;                             // 瞬移后重置方向记忆
+    if(e.bossId === "train" && Array.isArray(e.segments)){
+      // 列车瞬移：蛇身垂直排列在新蛇头下方并重建轨迹
+      e.segments.forEach((s, i) => { s.x = c*CELL; s.y = (r+1+i)*CELL; });
+      const tl2 = [];
+      for(let i=e.segments.length; i>=1; i--) tl2.push([c, r+i]);
+      tl2.push([c, r]);
+      e.trail = tl2;
+    }
+    addEffect("spawn", e.x + (e.bossId === "ship" ? 32 : 16), e.y + (e.bossId === "ship" ? 32 : 16), 0.6);
+    return;
+  }
+  for(let tries=0; tries<20; tries++){
+    const c = randInt(2, 15), r = randInt(1, 13);
+    if(bossCellFree(e, c, r)){
+      e.x = c*CELL; e.y = r*CELL;
+      if(e.bossId === "train" && Array.isArray(e.segments)){
+        e.segments.forEach((s, i) => { s.x = c*CELL; s.y = (r+1+i)*CELL; });
+        const tl2 = [];
+        for(let i=e.segments.length; i>=1; i--) tl2.push([c, r+i]);
+        tl2.push([c, r]);
+        e.trail = tl2;
+      }
+      addEffect("spawn", e.x + (e.bossId === "ship" ? 32 : 16), e.y + (e.bossId === "ship" ? 32 : 16), 0.6);
+      return;
+    }
+  }
+}
+/* 列车车头格检查：格可行 + 无其他坦克 + 不与自身车厢重叠 + 不驶向车厢正在前往的目标格（防绕圈迎面相撞） */
+function trainCellFree(e, c, r){
+  if(!bossCellFree(e, c, r)) return false;
+  for(const s of e.segments){
+    if(Math.floor((s.x + 16) / CELL) === c && Math.floor((s.y + 16) / CELL) === r) return false;   // 与车厢同格
+  }
+  if(e.segTarget && e.trail){
+    for(let i=0; i<e.segments.length; i++){
+      const gi = e.segTarget[i];
+      const gp = e.trail[gi];
+      if(gp && gp[0] === c && gp[1] === r){
+        // 谁先到达谁占格：蛇头 1 格行程 vs 车厢 i 到该格行程；车厢先到 → 排除，蛇头先到 → 允许（蛇头到达后该格成为旧格）
+        const s = e.segments[i];
+        const dSeg = Math.hypot(s.x - gp[0]*CELL, s.y - gp[1]*CELL);
+        const tSeg = dSeg / Math.max(36, e.speed + 8);
+        const tHead = CELL / Math.max(8, e.speed);
+        if(tSeg < tHead) return false;
+      }
+    }
+  }
+  return true;
+}
+/* 蛇头轨迹取点：沿历史路径从最新点往回累计 dist 像素处的坐标（车厢严格沿蛇头走过的路） */
+function pointOnHist(hist, dist){
+  const n = hist.length;
+  let acc = 0;
+  for(let k = n - 1; k > 0; k--){
+    const p1 = hist[k], p0 = hist[k - 1];
+    const segLen = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+    if(segLen <= 0) continue;
+    if(acc + segLen >= dist){
+      const t = (dist - acc) / segLen;
+      return { x: p0.x + (p1.x - p0.x) * t, y: p0.y + (p1.y - p0.y) * t };
+    }
+    acc += segLen;
+  }
+  return { x: hist[0].x, y: hist[0].y };   // 历史不足 → 取最早点
+}
+/* 死路检测：目标格必须「一步有活路」且「所在连通区域足够大」，避免车头走进被墙围死的盲区 */
+function trainDeadEnd(e, c, r, cameDir){
+  const rev = e.lastDir !== undefined ? (e.lastDir + 2) % 4 : -1;
+  // 一步活路：目标格除回头与来向外至少还有一方向可走（含车厢判定，防蛇身围死车头）
+  let live = false;
+  for(let d=0; d<4; d++){
+    if(d === rev || d === cameDir) continue;
+    const [dx, dy] = DIRS[d];
+    if(trainCellFree(e, c + dx, r + dy)){ live = true; break; }
+  }
+  if(!live) return true;
+  // 连通区域 BFS：目标格所在可通行区域至少 12 格（含车厢，蛇身把区域隔开即判死路）
+  const seen = new Set([c + "," + r]);
+  const q = [[c, r]];
+  let cnt = 0;
+  while(q.length && cnt < 16){
+    const [x, y] = q.pop();
+    cnt++;
+    for(let d=0; d<4; d++){
+      const [dx, dy] = DIRS[d];
+      const nx = x + dx, ny = y + dy;
+      if(nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) continue;
+      const k = nx + "," + ny;
+      if(seen.has(k)) continue;
+      if(!trainCellFree(e, nx, ny)) continue;
+      seen.add(k);
+      q.push([nx, ny]);
+    }
+  }
+  return cnt < 14;                             // 连通区太小 → 死路，不选
+}
+/* 列车车头选向：从候选方向中选第一个「可行、不走回头路、非死路」的方向；全部不可用返回 -1 */
+function trainPick(e, cands){
+  const ex = Math.floor((e.x + 16) / CELL), ey = Math.floor((e.y + 16) / CELL);
+  const rev = e.lastDir !== undefined ? (e.lastDir + 2) % 4 : -1;
+  for(const d of cands){
+    if(d === rev) continue;                               // 不走回头路（贪吃蛇）
+    const [dx, dy] = DIRS[d];
+    if(!trainCellFree(e, ex + dx, ey + dy)) continue;     // 目标格可行且无车厢
+    if(trainDeadEnd(e, ex + dx, ey + dy, d)) continue;    // 死路不选
+    return d;
+  }
+  return -1;
+}
+/* 列车车头选向（仅在格中心调用）：贪吃蛇式——狩猎期朝玩家、其余直行优先+横向随机，
+   绝不回头/进死路/与车厢同格；选定后写入 e.tg 下一目标格；被完全围死返回 false（停在格中心每帧重试，不瞬移） */
+function trainChooseDir(e){
+  const gc = e.tg[0], gr = e.tg[1];
+  const pc = Math.floor((game.player.x + 16) / CELL), pr = Math.floor((game.player.y + 16) / CELL);
+  const tryDir = (d) => {
+    if(d < 0 || d > 3) return false;
+    if(e.lastDir !== undefined && d === (e.lastDir + 2) % 4) return false;   // 不走回头路（贪吃蛇）
+    const [dx, dy] = DIRS[d];
+    const nc = gc + dx, nr = gr + dy;
+    if(nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) return false;
+    if(!trainCellFree(e, nc, nr)) return false;                              // 地形可行且无车厢
+    if(trainDeadEnd(e, nc, nr, d)) return false;                             // 死路不选
+    e.dir = d; e.tg = [nc, nr];
+    return true;
+  };
+  let d;
+  if(e.hunt > 0){
+    const toward = dirToward(e, pc, pr);
+    const [dx, dy] = DIRS[toward];
+    const side1 = dx !== 0 ? (dy > 0 ? 2 : 0) : (dx > 0 ? 1 : 3);
+    const side2 = dx !== 0 ? (dy > 0 ? 0 : 2) : (dx > 0 ? 3 : 1);
+    if(tryDir(toward) || tryDir(side1) || tryDir(side2)) return true;
+  }
+  if(Math.random() < 0.25){                                                  // 偶尔先试横向（保持随机性）
+    d = Math.random() < 0.5 ? 1 : 3;
+    if(tryDir(d) || tryDir(d === 1 ? 3 : 1)) return true;
+  }
+  if(tryDir(e.dir)) return true;                                             // 直行优先（蛇头延续当前方向）
+  d = Math.random() < 0.5 ? 1 : 3;                                           // 横向随机
+  if(tryDir(d) || tryDir(d === 1 ? 3 : 1)) return true;
+  if(tryDir(2) || tryDir(0)) return true;                                    // 纵向
+  if(tryDir(dirToward(e, pc, pr)) || tryDir(dirToward(e, 9, 17))) return true; // 朝玩家/大本营兜底
+  // 兜底：任选「地形可行、非回头、不与车厢当前同格」的方向（允许车厢目标格：蛇头优先占格，车厢会让路）
+  const rev = e.lastDir !== undefined ? (e.lastDir + 2) % 4 : -1;
+  for(let dd = 0; dd < 4; dd++){
+    if(dd === rev) continue;
+    const cc = gc + DIRS[dd][0], rr = gr + DIRS[dd][1];
+    if(cc < 0 || cc >= COLS || rr < 0 || rr >= ROWS) continue;
+    if(!bossCellFree(e, cc, rr)) continue;
+    let segThere = false;
+    for(const s of e.segments){
+      if(Math.floor((s.x + 16) / CELL) === cc && Math.floor((s.y + 16) / CELL) === rr){ segThere = true; break; }
+    }
+    if(segThere) continue;
+    e.dir = dd; e.tg = [cc, rr];
+    return true;
+  }
+  return false;   // 被完全围死（连地形可行格都没有）→ 停在格中心，每帧重试
+}
+/* 防卡住：普通敌人长时间不动则瞬移到开阔空地（优先第 1 行出生区） */
+function enemyTeleport(e){
+  for(let i=0; i<20; i++){
+    const c = randInt(2, 16);
+    if(cellWalkable(c, 1, "enemy") && !cellHasTank(c, 1, e)){
+      e.x = c*CELL; e.y = CELL;
+      addEffect("spawn", c*CELL+16, CELL+16, 0.5);
+      return;
+    }
+  }
+  for(let tries=0; tries<30; tries++){
+    const c = randInt(2, 16), r = randInt(1, 15);
+    if(cellWalkable(c, r, "enemy") && !cellHasTank(c, r, e) && !(Math.abs(c-9) <= 1 && Math.abs(r-17) <= 1)){
+      e.x = c*CELL; e.y = r*CELL;
+      addEffect("spawn", c*CELL+16, r*CELL+16, 0.5);
+      return;
+    }
+  }
+}
+/* 防卡住通用检测：位置长时间不变 → 返回 true 并重置计时 */
+function trackStuck(e, dt, threshold){
+  if(e.stuckX === undefined){ e.stuckX = e.x; e.stuckY = e.y; e.stuckT = 0; }
+  e.stuckT = (e.stuckT || 0) + dt;
+  if(Math.hypot(e.x - e.stuckX, e.y - e.stuckY) > 5){
+    e.stuckT = 0; e.stuckX = e.x; e.stuckY = e.y;
+    return false;
+  }
+  if(e.stuckT > threshold){
+    e.stuckT = 0; e.stuckX = e.x; e.stuckY = e.y;
+    return true;
+  }
+  return false;
+}
+function hasLOS(c0, r0, c1, r1){
+  if(c0 === c1){
+    const a = Math.min(r0, r1), b = Math.max(r0, r1);
+    for(let r=a+1; r<b; r++){
+      const v = game.map[r][c0];
+      if(v === 1 || v === 2 || v === 4 || v >= 8) return false; // 砖/钢/草丛/铁制护墙遮蔽视线
+    }
+    return true;
+  }
+  if(r0 === r1){
+    const a = Math.min(c0, c1), b = Math.max(c0, c1);
+    for(let c=a+1; c<b; c++){
+      const v = game.map[r0][c];
+      if(v === 1 || v === 2 || v === 4 || v >= 8) return false;
+    }
+    return true;
+  }
+  return false;
+}
+function maybeFire(e){
+  const ex = Math.floor((e.x + 16) / CELL), ey = Math.floor((e.y + 16) / CELL);
+  const [dx, dy] = DIRS[e.dir];
+  let aligned = false, los = false;
+  const pcx = Math.floor((game.player.x + 16) / CELL), pcy = Math.floor((game.player.y + 16) / CELL);
+  const targets = [[pcx, pcy], [9, 17]];
+  for(const [tx, ty] of targets){
+    if(dx !== 0 && ey === ty && ((dx > 0 && tx > ex) || (dx < 0 && tx < ex))){
+      aligned = true;
+      if(hasLOS(ex, ey, tx, ty)) los = true;
+    }
+    if(dy !== 0 && ex === tx && ((dy > 0 && ty > ey) || (dy < 0 && ty < ey))){
+      aligned = true;
+      if(hasLOS(ex, ey, tx, ty)) los = true;
+    }
+  }
+  let frontBrick = false;
+  const fc = ex + dx, fr = ey + dy;
+  if(fc >= 0 && fc < COLS && fr >= 0 && fr < ROWS) frontBrick = game.map[fr][fc] === 1;
+  const prob = frontBrick ? 0.85 : (aligned && los ? 0.9 : aligned ? 0.35 : 0.25);
+  if(Math.random() < prob) fireBullet(e, "enemy");
+}
+function updateEnemy(e, dt){
+  const [dx, dy] = DIRS[e.dir];
+  e.ai -= dt;
+  if(!aheadCellFree(e) || e.ai <= 0){
+    e.ai = 0.7 + Math.random()*0.5;
+    chooseDir(e);
+  }
+  const bumped = tryMove(e, DIRS[e.dir][0], DIRS[e.dir][1], dt);
+  // 撞墙快速换向：被挡即累计，仅"真正移动 >5px"才清零（原地微抖不清零）→ 0.3 秒内换向，解决卡边缘/被顶住反复撞墙
+  if(bumped) e.bumpT = (e.bumpT || 0) + dt;
+  else if(Math.hypot(e.x - (e._bx !== undefined ? e._bx : e.x), e.y - (e._by !== undefined ? e._by : e.y)) > 5) e.bumpT = 0;
+  e._bx = e.x; e._by = e.y;
+  if(e.bumpT > 0.3){
+    e.bumpT = 0;
+    e.lastFailDir = e.dir;                 // 记录刚撞墙方向：换向时避开
+    if(!chooseDir(e)) enemyTeleport(e);    // 完全无路可走 → 立即瞬移脱困
+    else e.ai = 0.3;
+  }
+  // 防卡住：1.2 秒几乎没动 → 强制换向（记录失败方向避开）；3.6 秒仍没动 → 瞬移空地。
+  // 被玩家堵住不算卡住（玩家离开即恢复），避免贴近玩家时误触发瞬移闪现
+  const npx = Math.floor((game.player.x + 16) / CELL), npr = Math.floor((game.player.y + 16) / CELL);
+  const nex = Math.floor((e.x + 16) / CELL), ney = Math.floor((e.y + 16) / CELL);
+  const nearPlayer = Math.abs(nex - npx) <= 1 && Math.abs(ney - npr) <= 1;
+  if(nearPlayer){ e.stuckT = 0; e.stuckCount = 0; }
+  else if(trackStuck(e, dt, 1.2)){
+    e.lastFailDir = e.dir;                 // 卡住方向 = 失败方向，换向避开（防反复撞同一方向）
+    if(!chooseDir(e)){ enemyTeleport(e); e.stuckCount = 0; }   // 无路可走 → 立即瞬移
+    else {
+      e.ai = 0.3;
+      if(e.stuckCount === undefined) e.stuckCount = 0;
+      e.stuckCount++;
+      if(e.stuckCount >= 2){ e.stuckCount = 0; enemyTeleport(e); }
+    }
+  } else {
+    e.stuckCount = 0;
+  }
+  if(e.etype === "fast"){
+    // 疾行兵：随机向行进方向左右横移 1 格（平滑滑动，避免瞬移闪现）
+    if(e.slide){
+      // 目标格失效（被堵/被占）→ 取消滑动，避免穿墙穿坦克
+      if(!cellWalkable(e.slide.tx, e.slide.ty, "enemy") || cellHasTank(e.slide.tx, e.slide.ty, e)){
+        e.slide = null;
+      } else {
+        const sx = e.slide.tx*CELL, sy = e.slide.ty*CELL;
+        const dx = sx - e.x, dy = sy - e.y;
+        const d = Math.hypot(dx, dy);
+        const step = 3*CELL*dt;                        // 滑动速度与疾行兵移速一致（3 格/秒）
+        if(d <= step){ e.x = sx; e.y = sy; e.slide = null; }
+        else { e.x += dx/d*step; e.y += dy/d*step; }
+      }
+    } else {
+      e.strafe -= dt;
+      if(e.strafe <= 0){
+        e.strafe = 0.8 + Math.random()*1.2;
+        const side = Math.random() < 0.5 ? 1 : -1;
+        const sx = -dy*side, sy = dx*side;           // 行进方向的垂直方向
+        const cc = Math.floor((e.x + 16) / CELL) + sx, cr = Math.floor((e.y + 16) / CELL) + sy;
+        if(cc >= 0 && cc < COLS && cr >= 0 && cr < ROWS && cellWalkable(cc, cr, "enemy") && !cellHasTank(cc, cr, e)){
+          e.slide = {tx: cc, ty: cr};
+        }
+      }
+    }
+  }
+  e.fire -= dt;
+  if(e.fire <= 0){
+    e.fire = ENEMY_FIRE_INT;
+    if(e.etype === "quad") fireQuad(e);              // 四向射手：四方向齐射
+    else maybeFire(e);
+  }
+}
+function fireQuad(e){
+  for(let d=0; d<4; d++){
+    const [dx, dy] = DIRS[d];
+    game.bullets.push({ x: e.x + 12 + dx*20, y: e.y + 12 + dy*20, dx, dy, owner:"enemy", dead:false });
+  }
+  SND.shootEnemy();
+}
+function gainKill(p, isP1){
+  p.killStreak++;
+  if(isP1) game.streak = p.killStreak;
+  if(p.killStreak >= 10 && p.level < 3){
+    p.killStreak = 0;
+    if(isP1) game.streak = 0;
+    p.level++;
+    addEffect("spawn", p.x+16, p.y+16, 0.8);
+    updateHUD();
+  }
+}
+function onPlayerKill(){ gainKill(game.player, true); }
+function killEnemy(e, owner){
+  e.dead = true;
+  game.killed++;
+  if(e.isBoss){
+    game.score += 5000;                              // Boss 高分
+    const ef = addEffect("boom", bossCX(e), bossCY(e), 1.2);
+    if(ef) ef.big = 3;
+    SND.boomBoss();
+  } else {
+    game.concurrent = Math.max(0, game.concurrent - 1);
+    game.score += 100;
+    addEffect("boom", e.x+16, e.y+16, 0.6);
+    SND.boomEnemy();
+  }
+  if(owner === "player2") gainKill(game.player2, false);
+  else onPlayerKill();
+  updateHUD();
+  saveGame();                                        // 击杀进度写入存档（中途可继续）
+  if(game.killed >= game.killTarget) levelClear();
+}
+/* Boss 通用：扣血与摧毁（车头被毁 → 整体消灭） */
+function damageBoss(e, dmg){
+  if(e.dead) return;
+  if(e.bossId === "godzilla" && e.shieldT > 0) return;   // 护盾期间无敌
+  e.hp -= dmg;
+  if(e.bossId === "godzilla"){
+    e.dmgAcc = (e.dmgAcc || 0) + dmg;
+    if(e.dmgAcc >= 10){                       // 累计 10 点伤害 → 银色护盾 5 秒
+      e.dmgAcc = 0;
+      e.shieldT = 5;
+      addEffect("spark", e.x + 48, e.y + 48, 0.8);
+      SND.hitBoss();
+      doVibrate(120);
+    }
+  }
+  if(e.hp <= 0){
+    killEnemy(e);
+  } else {
+    addEffect("spark", bossCX(e), bossCY(e), 0.3);
+    SND.hitBoss();
+  }
+}
+/* 哥斯拉护盾反射：玩家炮弹反弹朝玩家方向，转为敌方弹 */
+function reflectBullet(b, e){
+  const g = game;
+  const tanks = g.player2 ? [g.player, g.player2] : [g.player];
+  const alive = tanks.filter(pl => !pl.dead);
+  if(!alive.length){ b.dead = true; return; }
+  const pl = alive[0];
+  const ang = Math.atan2((pl.y + 16) - (b.y + 4), (pl.x + 16) - (b.x + 4));
+  b.dx = Math.cos(ang); b.dy = Math.sin(ang);
+  b.owner = "enemy"; b.ammo = "normal"; b.speed = BULLET_SPEED;
+  b.dead = false;
+  addEffect("spark", b.x + 4, b.y + 4, 0.3);
+  SND.hitBoss();
+  doVibrate(80);
+}
+/* 列车：打掉一节车厢 → boss 缩短一节（不消灭 boss） */
+function removeTrainSeg(e, seg){
+  const i = e.segments.indexOf(seg);
+  if(i >= 0){
+    e.segments.splice(i, 1);
+    addEffect("boom", seg.x+16, seg.y+16, 0.6);
+    SND.boomEnemy();
+  }
+}
+
+/* ================= Boss ================= */
+function spawnBoss(type){
+  const g = game;
+  g.bossSpawned = true;
+  // 大本营周围砖块自动变成钢制砖块
+  const layout = fortifyLayout(1);
+  for(const key in layout){
+    const r = Math.floor(key / COLS), c = key % COLS;
+    const v = g.map[r][c];
+    if(v === 1 || v >= 8) g.map[r][c] = 2;
+  }
+  addEffect("spark", 9*CELL+16, 17*CELL+16, 0.8);
+  const ok = type === "ship" ? spawnShipBoss(g) : type === "godzilla" ? spawnGodzillaBoss(g) : spawnTrainBoss(g);
+  if(!ok) g.killTarget = Math.max(0, g.killTarget - 1);   // 找不到出生位则本关不生成 Boss
+}
+function spawnShipBoss(g){
+  for(let i=0; i<60; i++){
+    const c = randInt(2, 15);
+    if(cellWalkable(c,1,"enemy") && cellWalkable(c+1,1,"enemy") &&
+       cellWalkable(c,2,"enemy") && cellWalkable(c+1,2,"enemy") &&
+       !rectHasTank(c*CELL, 1*CELL, 64, 64, null)){
+      g.enemies.push({
+        x:c*CELL, y:1*CELL, dir:2, dead:false, isBoss:true, bossId:"ship",
+        hp:BOSS_SHIP_HP[settings.difficulty], maxHp:BOSS_SHIP_HP[settings.difficulty],
+        speed:16, vx:0, vy:0, etype:"boss",
+        fireT:1.5, bombCd:0, steamT:0, ai:1,
+        huntT:10, hunt:0,
+        name:"路上战舰小和号"
+      });
+      return true;
+    }
+  }
+  return false;
+}
+function spawnTrainBoss(g){
+  for(let i=0; i<60; i++){
+    const c = randInt(2, 16);
+    let ok = true;
+    for(let rr=1; rr<=6; rr++){ if(!cellWalkable(c, rr, "enemy")) ok = false; }
+    if(ok && !rectHasTank(c*CELL, 1*CELL, 32, 32, null)){
+      const segs = [];
+      for(let i=1; i<=5; i++) segs.push({ x:c*CELL, y:(1+i)*CELL, hp:BOSS_TRAIN_SEG[settings.difficulty], maxHp:BOSS_TRAIN_SEG[settings.difficulty] });
+      // 贪吃蛇轨迹（旧→新）：蛇头走过的格序列，车厢沿此取格跟随
+      const trail = [];
+      for(let i=5; i>=1; i--) trail.push([c, 1+i]);
+      trail.push([c, 1]);
+      g.enemies.push({
+        x:c*CELL, y:1*CELL, dir:2, dead:false, isBoss:true, bossId:"train",
+        hp:BOSS_TRAIN_HEAD[settings.difficulty], maxHp:BOSS_TRAIN_HEAD[settings.difficulty],
+        speed:32, vx:0, vy:0, etype:"boss",                              // 普通速度 1 秒 1 格
+        segments:segs, segHp:BOSS_TRAIN_SEG[settings.difficulty], trail: trail,
+        tg:[c, 1],                                                     // 目标格 = 出生格，到达后立即选下一格
+        fireT:1.5, burst:0, burstT:0, laserCd:0, laserCharge:0,
+        huntT:10, hunt:0,
+        name:"像素无限列车"
+      });
+      return true;
+    }
+  }
+  return false;
+}
+function spawnGodzillaBoss(g){
+  let c = -1;
+  for(let i=0; i<80; i++){
+    const cc = randInt(2, 14);
+    let ok = true;
+    for(let dc=0; dc<3; dc++){
+      for(let dr=0; dr<3; dr++){
+        if(!cellWalkable(cc+dc, 1+dr, "enemy")) ok = false;
+      }
+    }
+    if(ok && !rectHasTank(cc*CELL, 1*CELL, 96, 96, null)){ c = cc; break; }
+  }
+  if(c < 0){ c = 8; for(let dc=0; dc<3; dc++) for(let dr=0; dr<3; dr++) g.map[1+dr][c+dc] = 0; }  // 兜底：清空出生区
+  g.enemies.push({
+    x:c*CELL, y:1*CELL, dir:2, dead:false, isBoss:true, bossId:"godzilla",
+    hp:BOSS_GODZILLA_HP[settings.difficulty], maxHp:BOSS_GODZILLA_HP[settings.difficulty],
+    speed:16, vx:0, vy:0, etype:"boss",                                   // 1 秒 0.5 格
+    ai:1.4, huntT:10, hunt:0, stuckT:0, stuckCount:0,
+    breathCd:8, warnT:0, redT:0, sweep:0, sweepAng:0, sweepStart:0, sweepEnd:0,
+    bombCd:3, bombBurst:0, bombTimer:0, gunCd:4, gunBurst:0, gunTimer:0,
+    dmgAcc:0, shieldT:0, lastHitT:0,
+    name:"机械哥斯拉"
+  });
+  return true;
+}
+/* 玩家所在象限（以哥斯拉圆心为中心的 4 个 90° 扇区），返回扫射起止角 */
+function godzillaSweepRange(e){
+  const g = game;
+  const cx = e.x + 48, cy = e.y + 48;
+  const targets = g.player2 && !g.player2.dead ? [g.player, g.player2] : [g.player];
+  let ang = Math.atan2((targets[0].y + 16) - cy, (targets[0].x + 16) - cx);
+  if(ang < 0) ang += Math.PI * 2;
+  const quad = Math.floor((ang + Math.PI/4) / (Math.PI/2)) % 4;   // 0=右 1=下 2=左 3=上
+  const center = quad * Math.PI/2;
+  return [center - Math.PI/4, center + Math.PI/4];
+}
+/* 原子吐息激光端点：嘴部（身体下方中央）沿当前角度伸出 7 格 */
+function godzillaBreathEnd(e){
+  return {
+    x: e.x + 48 + Math.cos(e.sweepAng) * 288,   // 9 格（288px）
+    y: e.y + 92 + Math.sin(e.sweepAng) * 288
+  };
+}
+/* 点到线段距离（用于激光命中判定） */
+function distToSeg(px, py, x1, y1, x2, y2){
+  const dx = x2 - x1, dy = y2 - y1;
+  const len2 = dx*dx + dy*dy;
+  let t = len2 > 0 ? ((px - x1)*dx + (py - y1)*dy) / len2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  const qx = x1 + t*dx, qy = y1 + t*dy;
+  return Math.hypot(px - qx, py - qy);
+}
+function updateBossGodzilla(e, dt){
+  const g = game;
+  // ---- 护盾：5 秒内停止移动（无敌与反射在 damageBoss / 炮弹命中处处理）----
+  if(e.shieldT > 0){
+    e.shieldT -= dt;
+    if(e.shieldT <= 0) addEffect("spark", e.x+48, e.y+48, 0.6);
+  } else {
+    // 横向随机缓慢移动（1 秒 0.5 格）；狩猎期朝玩家逼近；防卡住换向/瞬移
+    e.ai -= dt;
+    if(e.ai <= 0){
+      if(e.hunt > 0){ e.ai = 0.5; bossHuntDir(e); }
+      else { e.ai = 1.4; bossChooseDir(e); }
+    }
+    tryMove(e, DIRS[e.dir][0], DIRS[e.dir][1], dt);
+    const npx = Math.floor((g.player.x + 16) / CELL), npr = Math.floor((g.player.y + 16) / CELL);
+    const nex = Math.floor((e.x + 16) / CELL), ney = Math.floor((e.y + 16) / CELL);
+    const nearPlayer = Math.abs(nex - npx) <= 2 && Math.abs(ney - npr) <= 2;
+    if(nearPlayer){ e.stuckT = 0; e.stuckCount = 0; }
+    else if(trackStuck(e, dt, 2.2)){
+      bossChooseDir(e);
+      e.ai = 0.6;
+      e.stuckCount = (e.stuckCount || 0) + 1;
+      if(e.stuckCount >= 2){ e.stuckCount = 0; bossTeleport(e); }
+    } else {
+      e.stuckCount = 0;
+    }
+  }
+  // ---- 原子吐息状态机：冷却 10s → 红闪前摇 3s → 90° 横扫（10°/s）----
+  if(e.warnT > 0){
+    e.warnT -= dt;
+    e.redT -= dt;
+    if(e.redT <= 0) e.redT = 0.12;
+    if(e.warnT <= 0){
+      const [a0, a1] = godzillaSweepRange(e);
+      e.sweepAng = a0; e.sweepStart = a0; e.sweepEnd = a1;
+      e.sweep = (a1 - a0) / (10 * Math.PI/180);     // 90° ÷ 10°/s = 9 秒
+      addEffect("spark", e.x+48, e.y+88, 0.5);
+      SND.laserBoss();
+    }
+  } else if(e.sweep > 0){
+    e.sweep -= dt;
+    e.sweepAng += 10 * Math.PI/180 * dt;
+    // 激光命中玩家（带冷却防一帧多次扣血）
+    e.lastHitT -= dt;
+    const end = godzillaBreathEnd(e);
+    const tanks = g.player2 ? [g.player, g.player2] : [g.player];
+    for(const pl of tanks){
+      if(pl.dead) continue;
+      const px = pl.x + 16, py = pl.y + 16;
+      if(distToSeg(px, py, e.x+48, e.y+92, end.x, end.y) < 24 && e.lastHitT <= 0){
+        e.lastHitT = 0.8;
+        damageTank(pl, "side");
+      }
+    }
+    if(e.sweep <= 0){ e.breathCd = 10; e.sweep = 0; }
+  } else {
+    e.breathCd -= dt;
+    if(e.breathCd <= 0){
+      const tanks = g.player2 ? [g.player, g.player2] : [g.player];
+      if(!tanks.some(pl => pl.dead)){
+        e.warnT = 3;
+        e.breathCd = 999;              // 攻击序列进行中（warn+sweep）
+      } else {
+        e.breathCd = 1;
+      }
+    }
+  }
+  // ---- 定时炸弹：每 3 秒连续 3 发（0.35s 间隔），2 秒后爆炸 ----
+  if(e.bombBurst > 0){
+    e.bombTimer -= dt;
+    if(e.bombTimer <= 0){
+      e.bombBurst--;
+      e.bombTimer = 0.35;
+      dropGodzillaBomb(e);
+    }
+  } else {
+    e.bombCd -= dt;
+    if(e.bombCd <= 0){ e.bombCd = 3; e.bombBurst = 3; e.bombTimer = 0.1; }
+  }
+  // ---- 火炮：每 4 秒对玩家连续 3 发（0.3s 间隔）----
+  if(e.gunBurst > 0){
+    e.gunTimer -= dt;
+    if(e.gunTimer <= 0){
+      e.gunBurst--;
+      e.gunTimer = 0.3;
+      fireGodzillaCannon(e);
+    }
+  } else {
+    e.gunCd -= dt;
+    if(e.gunCd <= 0){ e.gunCd = 4; e.gunBurst = 3; e.gunTimer = 0.1; }
+  }
+}
+/* 哥斯拉定时炸弹投放：第 1 颗落玩家格，后 2 颗落玩家格相邻（随机方向） */
+function dropGodzillaBomb(e){
+  const g = game;
+  const tanks = g.player2 ? [g.player, g.player2] : [g.player];
+  const alive = tanks.filter(pl => !pl.dead);
+  if(!alive.length) return;
+  const pl = alive[0];
+  const pc = Math.floor((pl.x + 16) / CELL), pr = Math.floor((pl.y + 16) / CELL);
+  let cc = pc, rr = pr;
+  if(e.bombBurst < 2){
+    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+    for(let i=dirs.length-1; i>0; i--){ const j = Math.floor(Math.random()*(i+1)); [dirs[i],dirs[j]] = [dirs[j],dirs[i]]; }
+    for(const [dx,dy] of dirs){
+      const nc = pc+dx, nr = pr+dy;
+      if(nc >= 0 && nc < COLS && nr >= 0 && nr < ROWS){ cc = nc; rr = nr; break; }
+    }
+  }
+  g.bombs.push({ cx:cc, cy:rr, level:0, t:0, isBoss:true, fuse:2, godzilla:true, from:{x:e.x+48, y:e.y+48} });
+}
+/* 哥斯拉火炮：朝玩家方向发射普通炮弹 */
+function fireGodzillaCannon(e){
+  const g = game;
+  const tanks = g.player2 ? [g.player, g.player2] : [g.player];
+  const alive = tanks.filter(pl => !pl.dead);
+  if(!alive.length) return;
+  const pl = alive[0];
+  const ang = Math.atan2((pl.y + 16) - (e.y + 48), (pl.x + 16) - (e.x + 48));
+  g.bullets.push({ x: e.x + 84, y: e.y + 52, dx: Math.cos(ang), dy: Math.sin(ang), owner:"enemy", ammo:"normal", speed:BULLET_SPEED, pierce:0 });
+  addEffect("spark", e.x + 84, e.y + 52, 0.22);
+  SND.shootEnemy();
+}
+
+function updateBoss(e, dt){
+  // 狩猎周期：每 10 秒左右朝玩家靠近 5 秒，其余时间横向随机
+  e.huntT -= dt;
+  if(e.huntT <= 0){ e.huntT = 10 + Math.random()*3; e.hunt = 5; }
+  if(e.hunt > 0) e.hunt -= dt;
+  if(e.bossId === "ship") updateBossShip(e, dt);
+  else if(e.bossId === "train") updateBossTrain(e, dt);
+  else if(e.bossId === "godzilla") updateBossGodzilla(e, dt);
+}
+/* Boss 狩猎移动：朝玩家方向逼近（被挡时尝试垂直方向），返回是否可用 */
+function bossHuntDir(e){
+  const pc = Math.floor((game.player.x + 16) / CELL), pr = Math.floor((game.player.y + 16) / CELL);
+  const ec = Math.floor((e.x + 16) / CELL), er = Math.floor((e.y + 16) / CELL);
+  const d = dirToward(e, pc, pr);
+  const [dx, dy] = DIRS[d];
+  if(bossCellFree(e, ec + dx, er + dy)){ e.dir = d; return; }
+  const side = [[dy, dx], [-dy, -dx]];
+  for(const [sx, sy] of side){
+    if(bossCellFree(e, ec + sx, er + sy)){ e.dir = DIRS.findIndex(dd => dd[0] === sx && dd[1] === sy); return; }
+  }
+}
+function updateBossShip(e, dt){
+  const g = game;
+  // 蒸汽粒子：持续从烟囱冒出
+  e.steamT -= dt;
+  if(e.steamT <= 0){
+    e.steamT = 0.07;
+    const ef = addEffect("steam", e.x + 18 + Math.random()*28, e.y + 6, 0.9);
+    if(ef){ ef.dx = (Math.random()-0.5)*8; ef.dy = -4 - Math.random()*6; }
+  }
+  // 横向随机移动（1秒0.5格）；狩猎期朝玩家逼近；防卡住换向/瞬移（玩家附近不瞬移）
+  e.ai -= dt;
+  if(e.ai <= 0){
+    if(e.hunt > 0){ e.ai = 0.5; bossHuntDir(e); }
+    else { e.ai = 1.4; bossChooseDir(e); }
+  }
+  tryMove(e, DIRS[e.dir][0], DIRS[e.dir][1], dt);
+  const npx = Math.floor((game.player.x + 16) / CELL), npr = Math.floor((game.player.y + 16) / CELL);
+  const nex = Math.floor((e.x + 16) / CELL), ney = Math.floor((e.y + 16) / CELL);
+  const nearPlayer = Math.abs(nex - npx) <= 2 && Math.abs(ney - npr) <= 2;
+  if(nearPlayer){ e.stuckT = 0; e.stuckCount = 0; }
+  else if(trackStuck(e, dt, 2.2)){
+    bossChooseDir(e);
+    e.ai = 0.6;
+    if(e.stuckCount === undefined) e.stuckCount = 0;
+    e.stuckCount++;
+    if(e.stuckCount >= 2){ e.stuckCount = 0; bossTeleport(e); }
+  } else {
+    e.stuckCount = 0;
+  }
+  // 向玩家方向 2 秒一轮 4 发炮弹
+  e.fireT -= dt;
+  if(e.fireT <= 0){
+    e.fireT = 2;
+    const ang = Math.atan2((g.player.y+16) - (e.y+32), (g.player.x+16) - (e.x+32));
+    for(let k=0; k<4; k++){
+      const a = ang + (k-1.5)*0.22;
+      const dx = Math.cos(a), dy = Math.sin(a);
+      g.bullets.push({ x:e.x+32+dx*40, y:e.y+32+dy*40, dx, dy, owner:"enemy", dead:false });
+    }
+    SND.shootBoss();
+  }
+  // 玩家靠近 4 格内：朝玩家方向抛洒 3 枚炸弹（落地 1 秒后爆炸）
+  const dist = Math.hypot((e.x+32)-(g.player.x+16), (e.y+32)-(g.player.y+16));
+  e.bombCd -= dt;
+  if(dist < 4*CELL && e.bombCd <= 0 && !g.player.dead){
+    e.bombCd = 5;
+    const pc = Math.floor((g.player.x+16)/CELL), pr = Math.floor((g.player.y+16)/CELL);
+    const offs = [[0,0],[1,0],[-1,0]];
+    for(const [oc, orr] of offs){
+      const c = pc+oc, r = pr+orr;
+      if(c >= 0 && c < COLS && r >= 0 && r < ROWS){
+        g.bombs.push({ cx:c, cy:r, level:0, t:0, isBoss:true, fuse:1.5, from:{x:e.x+32, y:e.y+32} });
+      }
+    }
+    addEffect("spark", e.x+32, e.y+32, 0.4);
+  }
+}
+function updateBossTrain(e, dt){
+  const g = game;
+  // 冲刺计时：速度 96 = 3 格/秒；普通 32 = 1 格/秒（严格逐格移动）
+  if(e.sprint > 0){
+    e.speed = 96;
+    e.sprint -= dt;
+    if(e.sprint <= 0) e.speed = 32;
+  }
+  // ---- 车头严格格步进：每帧向目标格中心移动；到达格中心 → 记录轨迹 → 选下一格。
+  //      转弯只发生在格中心，路径严格沿格线；目标不可行即重选，绝不瞬移、绝不停止（被完全围死除外）----
+  if(e.tg === undefined){
+    e.tg = [Math.floor((e.x + 16) / CELL), Math.floor((e.y + 16) / CELL)];
+  }
+  let guard = 0;
+  while(guard++ < 6){
+    const tx = e.tg[0]*CELL, ty = e.tg[1]*CELL;
+    const dx = tx - e.x, dy = ty - e.y;
+    const d = Math.hypot(dx, dy);
+    if(d < 0.5){
+      e.x = tx; e.y = ty;                    // 吸附到格中心
+      // 贪吃蛇轨迹：蛇头每次进入新格就追加；轨迹只增不减（车厢索引单调推进），超长才清理
+      const tl = e.trail;
+      const tlLast = tl[tl.length - 1];
+      if(tlLast[0] !== e.tg[0] || tlLast[1] !== e.tg[1]){
+        tl.push([e.tg[0], e.tg[1]]);
+        if(tl.length > 300){
+          const cut = tl.length - 200;
+          tl.splice(0, cut);
+          for(let si=0; si<e.segments.length; si++){
+            if(e.segTarget && e.segTarget[si] !== undefined) e.segTarget[si] = Math.max(0, e.segTarget[si] - cut);
+          }
+        }
+      }
+      e.lastDir = e.dir;                     // 实际移动方向 = 回头判定基准
+      // 冲刺触发（仅格中心转向）：与玩家同行/列且激光就绪 → 朝玩家冲刺 1.2 秒并蓄力激光
+      const hc = e.tg[0], hr = e.tg[1];
+      const pc = Math.floor((g.player.x + 16) / CELL), pr = Math.floor((g.player.y + 16) / CELL);
+      const aligned = (hc === pc && hr !== pr) || (hr === pr && hc !== pc);
+      if(aligned && !e.sprint && e.laserCd <= 0 && e.laserCharge <= 0 && !g.player.dead){
+        const td = dirToward(e, pc, pr);
+        if(e.lastDir === undefined || td !== ((e.lastDir + 2) % 4)){       // 不向回头方向冲
+          const [cdx, cdy] = DIRS[td];
+          const ncc = hc + cdx, nrr = hr + cdy;
+          if(ncc >= 0 && ncc < COLS && nrr >= 0 && nrr < ROWS && trainCellFree(e, ncc, nrr)){
+            e.dir = td;
+            e.sprint = 1.2;
+            e.laserCharge = 1;
+            addEffect("spark", e.x + 16, e.y + 16, 0.3);
+          }
+        }
+      }
+      // 选下一格（含刚触发的冲刺方向）；被完全围死 → 短暂等待后触发解困（车厢倒车+蛇头沿原路退出），避免永久卡死
+      if(!trainChooseDir(e)){
+        e.unstick = (e.unstick || 0) + dt;
+        if(e.unstick > 0.6 && e.lastDir !== undefined){
+          if(!e.unstuckOnce){                        // 仅触发一次：整列车厢链式倒车一格（身后让路）
+            for(let j=0; j<e.segments.length; j++){
+              e.segTarget[j] = Math.max(0, (e.segTarget[j] !== undefined ? e.segTarget[j] : tl.length - 2 - j) - 1);
+            }
+            e.unstuckOnce = true;
+          }
+          // 车厢 1 已退开（距蛇头 > 40px）→ 蛇头沿原路回头脱困
+          const s0 = e.segments[0];
+          if(Math.hypot(s0.x - e.x, s0.y - e.y) > 40){
+            const revD = (e.lastDir + 2) % 4;
+            const rcc = e.tg[0] + DIRS[revD][0], rrr = e.tg[1] + DIRS[revD][1];
+            if(rcc >= 0 && rcc < COLS && rrr >= 0 && rrr < ROWS && bossCellFree(e, rcc, rrr)){
+              e.dir = revD;
+              e.tg = [rcc, rrr];
+              e.unstick = 0;
+              e.unstuckOnce = false;
+            }
+          }
+        }
+        break;
+      }
+      e.unstick = 0;                         // 选向成功 → 解除解困标记
+      continue;                              // 剩余步长继续向新目标格移动（不停止）
+    }
+    const step = Math.min(e.speed * dt, d);
+    e.x += dx / d * step;
+    e.y += dy / d * step;
+    break;
+  }
+  // 列车碾压普通敌人：车头/车厢压过的普通敌人被摧毁（火车无情，防止堵住列车路线）
+  const crush = (cx, cy) => {
+    for(const en of g.enemies){
+      if(en.dead || en === e || en.isBoss) continue;
+      if(en.x < cx + 32 && en.x + 32 > cx && en.y < cy + 32 && en.y + 32 > cy){
+        killEnemy(en);                 // 计入击杀（原直接 dead=true 不计数 → 关卡永远杀不满 killTarget、无法通关）
+      }
+    }
+  };
+  crush(e.x, e.y);
+  for(const sg of e.segments) crush(sg.x, sg.y);
+  // 车厢严格沿蛇头轨迹逐格跟随：每节车厢维护自己的轨迹索引 segTarget[i]，
+  // 只向轨迹上的下一格移动（后一节只走前一节的路），到达后才推进到下一格；前节占用下一格则等待。
+  // 目标索引单调递增，永不跳变——转弯/冲刺也不会斜穿或拉长。
+  const tl = e.trail;
+  const segs = e.segments;
+  const segSpeed = Math.max(36, e.speed + 8);   // 略快于蛇头（追赶机制）：转弯/冲刺后车厢能追回
+  if(!e.segTarget) e.segTarget = [];
+  for(let i=0; i<segs.length; i++){
+    const cur = segs[i];
+    let gi = e.segTarget[i];
+    if(gi === undefined) gi = tl.length - 2 - i;      // 初始：蛇头前 (i+1) 格
+    const maxGi = tl.length - 2;                      // 最多追到蛇头上一格
+    if(gi > maxGi) gi = maxGi;
+    e.segTarget[i] = gi;
+    const gp = tl[gi];
+    if(!gp){ cur.x = e.x; cur.y = e.y; continue; }
+    // 目标格被蛇头即将占据（围死兜底才可能）：本车厢及之后所有车厢各后退一格（链式倒车，保持链序不重叠），让蛇头先占格
+    const htg = e.tg;
+    if(htg && gp[0] === htg[0] && gp[1] === htg[1]){
+      for(let j=i; j<segs.length; j++){
+        e.segTarget[j] = Math.max(0, (e.segTarget[j] !== undefined ? e.segTarget[j] : tl.length - 2 - j) - 1);
+      }
+      continue;
+    }
+    const tx = gp[0]*CELL, ty = gp[1]*CELL;
+    let dx = tx - cur.x, dy = ty - cur.y;
+    const d = Math.hypot(dx, dy);
+    if(d < 2){
+      // 到达目标格中心：若下一轨迹格未被前节占用则推进，否则等待前节离开
+      const ng = Math.min(gi + 1, tl.length - 2);
+      const ngp = tl[ng];
+      if(ngp){
+        const pu = i === 0 ? e : segs[i-1];
+        const puC = Math.floor((pu.x + 16) / CELL), puR = Math.floor((pu.y + 16) / CELL);
+        const ngC = Math.floor((ngp[0]*CELL + 16) / CELL), ngR = Math.floor((ngp[1]*CELL + 16) / CELL);
+        if(!(puC === ngC && puR === ngR)){
+          e.segTarget[i] = ng;
+        }
+      }
+      continue;   // 本帧已到达，等下一帧向新格移动
+    }
+    const step = Math.min(d, segSpeed * dt);
+    cur.x += dx / d * step;
+    cur.y += dy / d * step;
+  }
+  // 每节车厢向行进方向两侧射击：2.5 秒一轮，一轮连续 3 发（0.45 秒间隔）
+  e.burstT -= dt;
+  if(e.burst > 0 && e.burstT <= 0){
+    e.burstT = 0.45;
+    fireTrainSegments(e);
+    e.burst--;
+  }
+  e.fireT -= dt;
+  if(e.fireT <= 0){
+    e.fireT = 2.5;                  // 车厢射击周期 2 秒 → 2.5 秒
+    e.burst = 3;
+    e.burstT = 0;
+  }
+  if(e.laserCharge > 0){
+    e.laserCharge -= dt;
+    if(e.laserCharge <= 0){
+      e.laserCharge = 0;
+      e.laserCd = 3.5;              // 激光 CD 3 秒 → 3.5 秒
+      const [lx, ly] = DIRS[e.dir];
+      g.bullets.push({ x: e.x+12+lx*32, y: e.y+12+ly*32, dx:lx, dy:ly, owner:"enemy", dead:false, laser:3 });
+      addEffect("spark", e.x+16+lx*32, e.y+16+ly*32, 0.4);
+      SND.laserBoss();
+    }
+  }
+}
+function fireTrainSegments(e){
+  // 每节（车头+车厢）向自身行进方向的垂直两侧各发射 1 发
+  const parts = [e].concat(e.segments);
+  for(let idx=0; idx<parts.length; idx++){
+    const seg = parts[idx];
+    let bdx, bdy;
+    if(idx === 0){ [bdx, bdy] = DIRS[e.dir]; }
+    else {
+      const prev = parts[idx-1];
+      bdx = seg.x - prev.x; bdy = seg.y - prev.y;
+      const m = Math.max(Math.abs(bdx), Math.abs(bdy), 1);
+      bdx /= m; bdy /= m;
+    }
+    const s1x = -bdy, s1y = bdx, s2x = bdy, s2y = -bdx;
+    const cx = seg.x + 16, cy = seg.y + 16;
+    game.bullets.push({ x: cx + s1x*22, y: cy + s1y*22, dx: s1x, dy: s1y, owner:"enemy", dead:false });
+    game.bullets.push({ x: cx + s2x*22, y: cy + s2y*22, dx: s2x, dy: s2y, owner:"enemy", dead:false });
+  }
+  SND.shootBoss();
+}
+/* 玩家与 Boss（含列车车厢）重叠/接触 → 玩家损坏 */
+function bossTouchPlayer(){
+  const tanks = game.player2 ? [game.player, game.player2] : [game.player];
+  for(const pl of tanks){
+    if(pl.dead || pl.inv > 0) continue;
+    const rp = tankRect(pl);
+    for(const e of game.enemies){
+      if(e.dead || !e.isBoss) continue;
+      if(rp.x < e.x+bossW(e) && rp.x+rp.w > e.x && rp.y < e.y+bossH(e) && rp.y+rp.h > e.y){ destroyTank(pl, pl === game.player); return; }
+      for(const seg of (e.segments || [])){
+        if(rp.x < seg.x+32 && rp.x+rp.w > seg.x && rp.y < seg.y+32 && rp.y+rp.h > seg.y){ destroyTank(pl, pl === game.player); return; }
+      }
+    }
+  }
+}
+
+/* ================= 关卡 / 胜负 / 卡牌 ================= */
+function destroyBase(){
+  if(!game.baseAlive) return;
+  game.baseAlive = false;
+  addEffect("boom", 9*CELL+16, 17*CELL+16, 1.0);
+  game.state = "over";
+  game.overType = "lose";
+  showOverlay("lose");
+  SND.lose();
+  doVibrate(200);
+  clearSave();                                     // 失败后不再可继续
+  updateHUD();
+}
+const CARD_POOL = [
+  { id:"multishot", name:"炮管数量+1", desc:"每次开火多发射 1 发炮弹，前后间隔 0.5 格；可叠加 2 次，最多 3 发连射", icon:"multi" },
+  { id:"barrier", name:"装甲屏障", desc:"为自身抵挡 1 发炮弹，被击中后屏障消失；不可叠加", icon:"barrier" },
+  { id:"fortify", name:"基地工事", desc:"修复大本营破损工事；若本关工事完好则升级：加第二圈砖墙 / 第一圈变铁制护墙（挡 3 发）", icon:"fort" },
+  { id:"bomb", name:"定时炸弹", desc:"按 B 键部署炸弹，5 秒后爆炸；按选择次数 1-3 级，爆炸半径 1-3 格", icon:"bomb" },
+  { id:"drone", name:"无人机", desc:"进入关卡 10 秒后自动生成四旋翼无人机，无视地形飞向最近敌人造成 1 炮伤害；Lv1 被击毁 5 秒重生、Lv2 立刻重生、Lv3 双机（第二架延迟 3 秒）", icon:"drone" },
+  { id:"apfsds", name:"尾翼稳定脱壳穿甲弹", desc:"按 1 切换普通炮弹、按 2 切换穿甲弹：装填+0.5s，飞行速度 2 倍，伤害 2 倍，可穿透 1 个砖块或敌人后对后续目标造成伤害；对 Boss 不穿透", icon:"apfsds" },
+  { id:"he", name:"榴弹", desc:"按 1 切换普通炮弹、按 3 切换榴弹：装填+0.5s，飞行速度不变，命中目标后爆炸，造成 3×3 范围伤害（同 1 级定时炸弹）", icon:"he" }
+];
+function cardMaxed(id){
+  const b = game.buffs;
+  if(id === "multishot") return b.multishot >= 2;
+  if(id === "barrier") return b.barrier;
+  if(id === "bomb") return b.bomb >= 3;
+  if(id === "drone") return b.drone >= 3;
+  if(id === "apfsds") return !!b.apfsds;
+  if(id === "he") return !!b.he;
+  return false;
+}
+function drawCards(){
+  const avail = CARD_POOL.filter(c => !cardMaxed(c.id)).slice();
+  const picks = [];
+  while(picks.length < 3 && avail.length){
+    const i = Math.floor(Math.random() * avail.length);
+    picks.push(avail[i]);
+    avail.splice(i, 1);                       // 已选移除，保证三张不重复
+  }
+  while(picks.length < 3) picks.push(CARD_POOL[Math.floor(Math.random() * CARD_POOL.length)]);
+  return picks;
+}
+function applyCard(card){
+  const b = game.buffs;
+  if(card.id === "multishot") b.multishot = Math.min(2, b.multishot + 1);
+  else if(card.id === "barrier") b.barrier = true;
+  else if(card.id === "fortify") applyFortify();
+  else if(card.id === "bomb"){
+    b.bomb = Math.min(3, b.bomb + 1);
+    game.bombTip = 3;                       // 获得炸弹后提示按键设置，持续 3 秒
+  }
+  else if(card.id === "drone") b.drone = Math.min(3, (b.drone || 0) + 1);
+  else if(card.id === "apfsds") b.apfsds = true;
+  else if(card.id === "he") b.he = true;
+}
+function buffsText(){
+  const b = game.buffs;
+  const parts = [];
+  if(b.multishot) parts.push("双管×" + (b.multishot+1));
+  if(b.barrier) parts.push("屏障");
+  if(b.bomb) parts.push("炸弹Lv" + b.bomb);
+  if(b.fortify) parts.push("工事Lv" + b.fortify);
+  if(b.drone) parts.push("无人机Lv" + b.drone);
+  if(b.apfsds) parts.push("穿甲弹");
+  if(b.he) parts.push("榴弹");
+  return parts.length ? parts.join(" ") : "无";
+}
+function showCards(){
+  const picks = drawCards();
+  cardRow.innerHTML = "";
+  const title = document.getElementById("cardTitle");
+  title.textContent = "第 " + game.level + " 关 通过！";
+  document.getElementById("cardCurrent").textContent = buffsText();
+  picks.forEach(card => {
+    const el = document.createElement("div");
+    el.className = "card";
+    const cv = document.createElement("canvas");
+    cv.width = 40; cv.height = 40;
+    drawCardIcon(cv, card.icon);
+    const h3 = document.createElement("h3");
+    h3.textContent = card.name;
+    const lvl = document.createElement("div");
+    lvl.className = "lvl";
+    lvl.textContent = cardLevelText(card.id);
+    const p = document.createElement("p");
+    p.textContent = card.desc;
+    const pk = document.createElement("div");
+    pk.className = "pick";
+    pk.textContent = "点击选择";
+    el.appendChild(cv); el.appendChild(h3); el.appendChild(lvl); el.appendChild(p); el.appendChild(pk);
+    el.addEventListener("click", () => {
+      applyCard(card);
+      hideCards();
+      game.level++;
+      initLevel();
+      updateHUD();
+      saveGame();                                  // 新关卡进度写入存档
+    });
+    cardRow.appendChild(el);
+  });
+  cardOverlay.classList.remove("hidden");
+}
+function cardLevelText(id){
+  const b = game.buffs;
+  if(id === "multishot") return b.multishot >= 2 ? "（已满级）" : "当前 " + (b.multishot+1) + " 连发 → " + (b.multishot+2) + " 连发";
+  if(id === "barrier") return b.barrier ? "" : "新增强化";
+  if(id === "bomb") return b.bomb >= 3 ? "（已满级）" : "当前 Lv" + b.bomb + " → Lv" + (b.bomb+1);
+  if(id === "fortify") return b.fortify >= 2 ? "修复当前工事" : "当前 第" + (b.fortify+1) + "阶段 → 升级";
+  if(id === "drone") return b.drone === 0 ? "新增强化" : b.drone >= 3 ? "（已满级）" : "当前 Lv" + b.drone + " → Lv" + (b.drone+1);
+  if(id === "apfsds") return b.apfsds ? "（已拥有）" : "新增强化";
+  if(id === "he") return b.he ? "（已拥有）" : "新增强化";
+  return "";
+}
+function hideCards(){ cardOverlay.classList.add("hidden"); }
+function levelClear(){
+  game.state = "clear";
+  game.score += 500;
+  updateHUD();
+  SND.win();                                    // 播放胜利音效
+  const clearedLevel = game.level;
+  setTimeout(() => {                            // 胜利后 1 秒出现结算画面（无需暂停）
+    if(!game || game.state !== "clear") return;
+    if(game.bossMode || clearedLevel >= 10){    // Boss 战通关 / 第 10 关通关 → 恭喜通关
+      clearSave();                              // 通关后存档结束
+      showOverlay("win");
+      return;
+    }
+    showCards();
+  }, 1000);
+}
+function initLevel(){
+  const g = game;
+  g.map = genMap();
+  writeFortify(g.buffs.fortify);
+  g.player = makePlayer(settings.tankType);
+  g.player2 = settings.mode === "duo" ? makePlayer(settings.tankType2 || settings.tankType, 4*CELL, 1*CELL, 2) : null;
+  g.enemies = [];
+  g.bullets = [];
+  g.effects = [];
+  g.bombs = [];
+  g.laser = null;
+  // 敌人生成队列：普通轻型 8 台 + quad + fast（boss 独立警告后入场）
+  const plan = levelEnemyPlan(g.level);
+  g.enemyQueue = [];
+  for(let i=0; i<plan.light; i++) g.enemyQueue.push("light");
+  for(let i=0; i<plan.quad; i++) g.enemyQueue.push("quad");
+  for(let i=0; i<plan.fast; i++) g.enemyQueue.push("fast");
+  g.totalEnemies = g.enemyQueue.length;
+  g.bossPlan = g.bossIdOverride || bossForLevel(g.level);
+  g.killTarget = g.totalEnemies + (g.bossPlan ? 1 : 0);
+  g.bossWarn = g.bossPlan ? 3 : 0;          // Boss 出现前警告 3 秒
+  g.bossSpawned = false;
+  g.concurrent = 0; g.spawnTimer = 0.4; g.killed = 0;
+  g.baseAlive = true;
+  g.shake = 0; g.alarmSnd = 0;
+  g.drones = []; g.droneCd = 10; g.droneWait = true;   // 无人机：10 秒后生成第一架
+  canvas.style.transform = "";
+  g.state = "playing";
+  g.diffPal = ENEMY_PALS[settings.difficulty];
+  hideOverlay();
+  hideCards();
+  updateHUD();
+}
+/* ================= 存档 / 继续游戏 ================= */
+function saveGame(){
+  if(!game || !game.player) return;
+  try{
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      v: 1,
+      level: game.level,
+      score: game.score,
+      buffs: game.buffs,
+      streak: game.streak,
+      killed: game.killed,
+      enemyQueue: game.enemyQueue.slice(),
+      livesLeft: game.livesLeft,
+      bossIdOverride: game.bossIdOverride || null,
+      difficulty: settings.difficulty,
+      tankType: settings.tankType,
+      tankType2: settings.tankType2 || settings.tankType,
+      lives: settings.lives,
+      mode: settings.mode
+    }));
+  }catch(e){}
+}
+function hasSave(){
+  try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; }
+}
+function clearSave(){
+  try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
+}
+/* ================= Boss 战模式 ================= */
+function openBossSelect(){
+  SND.init(); SND.resume();
+  bossRow.innerHTML = "";
+  const BOSSES = [
+    { id:"ship", level:5, name:"路上战舰小和号", desc:"第 5 关 Boss · 巨型战舰 · 四向齐射 · 蒸汽特效" },
+    { id:"train", level:10, name:"像素无限列车", desc:"第 10 关 Boss · 装甲列车 · 贪吃蛇行动 · 车头激光" },
+    { id:"godzilla", level:1, name:"机械哥斯拉", desc:"Boss 战限定 · 机械怪兽 · 原子吐息横扫 · 定时炸弹轰炸" }
+  ];
+  for(const b of BOSSES){
+    const card = document.createElement("div");
+    card.className = "card";
+    const cv = document.createElement("canvas");
+    cv.width = 128; cv.height = 96;
+    drawBossIcon(cv, b.id);
+    const h3 = document.createElement("h3");
+    h3.textContent = b.name;
+    const ds = document.createElement("div");
+    ds.className = "card-desc";
+    ds.textContent = b.desc;
+    const pk = document.createElement("div");
+    pk.className = "pick";
+    pk.textContent = "进入挑战";
+    card.appendChild(cv); card.appendChild(h3); card.appendChild(ds); card.appendChild(pk);
+    card.addEventListener("click", () => {
+      bossOverlay.classList.add("hidden");
+      openBossPick(b.level, b.id);
+    });
+    bossRow.appendChild(card);
+  }
+  bossOverlay.classList.remove("hidden");
+}
+function drawBossIcon(cv, id){
+  const c = cv.getContext("2d");
+  c.fillStyle = "#0b0b10";
+  c.fillRect(0, 0, 128, 96);
+  c.strokeStyle = "rgba(255,255,255,.07)";
+  c.strokeRect(0.5, 0.5, 127, 95);
+  if(id === "godzilla"){
+    // 机械哥斯拉俯视剪影（缩略图）：尾 + 躯干 + 手臂 + 龙头
+    c.fillStyle = "#39424c";
+    c.fillRect(52, 4, 24, 5);
+    c.fillStyle = "#2e353d";
+    c.fillRect(48, 9, 32, 5);
+    c.fillRect(44, 14, 40, 5);
+    c.fillStyle = "#333b44";
+    c.fillRect(24, 12, 18, 6);
+    c.fillRect(86, 12, 18, 6);
+    c.fillStyle = "#3d444d";
+    c.fillRect(22, 22, 84, 30);
+    c.fillStyle = "#4d565f";
+    c.fillRect(28, 27, 72, 20);
+    c.fillStyle = "#2b323a";
+    for(let i=0; i<6; i++) c.fillRect(30 + i*10, 24, 5, 10);
+    c.fillStyle = "#e84545";
+    for(let i=0; i<6; i++) c.fillRect(31 + i*10, 24, 2, 7);
+    c.fillStyle = "#2e353d";
+    c.fillRect(14, 30, 12, 14);
+    c.fillRect(102, 30, 12, 14);
+    c.fillStyle = "#23282f";
+    c.fillRect(14, 43, 4, 6); c.fillRect(20, 44, 4, 5); c.fillRect(26, 43, 4, 6);
+    c.fillRect(98, 43, 4, 6); c.fillRect(104, 44, 4, 5); c.fillRect(110, 43, 4, 6);
+    c.fillStyle = "#2b323a";
+    c.fillRect(104, 26, 9, 16);
+    c.fillStyle = "#3d444d";
+    c.fillRect(34, 52, 60, 22);
+    c.fillStyle = "#4d565f";
+    c.fillRect(40, 55, 48, 15);
+    c.fillStyle = "#23282f";
+    c.fillRect(30, 52, 8, 10); c.fillRect(90, 52, 8, 10);
+    c.fillStyle = "#2e353d";
+    c.fillRect(40, 70, 48, 8);
+    c.fillStyle = "#ff6b6b";
+    c.fillRect(44, 73, 40, 4);
+    c.fillStyle = "#ffd54d";
+    c.fillRect(42, 58, 5, 4); c.fillRect(81, 58, 5, 4);
+    c.fillStyle = "#e84545";
+    c.fillRect(64, 20, 4, 3);
+    return;
+  }
+  if(id === "ship"){
+    // 战舰俯视剪影：舰体 + 双炮塔 + 蒸汽
+    c.fillStyle = "#7a1f2b";
+    c.fillRect(32, 26, 62, 44);
+    c.fillStyle = "#a0283a";
+    c.fillRect(42, 34, 42, 28);
+    c.fillStyle = "#e84545";
+    c.fillRect(52, 42, 24, 12);
+    c.fillStyle = "#5c646d";
+    c.fillRect(58, 30, 6, 10); c.fillRect(66, 30, 6, 10);
+    c.fillStyle = "#8f98a2";
+    c.fillRect(94, 22, 8, 6); c.fillRect(102, 14, 6, 5); c.fillRect(108, 22, 5, 4);
+    c.fillStyle = "#ffd54d";
+    c.fillRect(36, 30, 8, 3);
+  } else {
+    // 列车俯视剪影：车头 + 两节车厢
+    c.fillStyle = "#3d444d";
+    c.fillRect(14, 34, 42, 26);
+    c.fillStyle = "#e84545";
+    c.fillRect(14, 34, 15, 26);
+    c.fillStyle = "#ffd54d";
+    c.fillRect(47, 40, 6, 6);
+    c.fillStyle = "#2a2f36";
+    c.fillRect(56, 34, 34, 26); c.fillRect(90, 34, 22, 26);
+    c.fillStyle = "#5c646d";
+    c.fillRect(16, 30, 38, 4);
+    c.fillStyle = "#8f98a2";
+    c.fillRect(24, 22, 5, 8);
+    c.fillStyle = "#c4ccd4";
+    c.fillRect(60, 40, 6, 6); c.fillRect(70, 40, 6, 6); c.fillRect(76, 40, 6, 6);
+    c.fillRect(94, 40, 6, 6); c.fillRect(102, 40, 6, 6);
+    c.fillStyle = "#ffd54d";
+    c.fillRect(40, 42, 8, 4);
+  }
+}
+function bossBattle(lv, bossId){
+  SND.init(); SND.resume();
+  clearSave();
+  game = {
+    level: lv, score: 0, state: "playing", paused: false, overType: null,
+    buffs: { multishot: 0, barrier: false, bomb: 0, fortify: 0, drone: false, apfsds: false, he: false },
+    streak: 0,
+    livesLeft: LIVES_MAX[settings.lives],
+    bossMode: true,
+    bossIdOverride: bossId || null
+  };
+  initLevel();
+  showScreen("game");
+  document.getElementById("btnPause").textContent = "暂停";
+  updateHUD();
+  SND.bgmStart("game");
+  saveGame();
+}
+
+/* ===== Boss 战增益卡牌多选（至多 6 张） ===== */
+let bossPickLevel = 0;
+let bossPickBossId = null;      // 选中的 Boss id
+const bossPick = {};            // id -> card
+const PICK_MAX_LV = { multishot: 2, bomb: 3, drone: 3 };   // 可分级卡牌满级
+function openBossPick(lv, bossId){
+  SND.init(); SND.resume();
+  bossPickLevel = lv;
+  bossPickBossId = bossId || null;
+  Object.keys(bossPick).forEach(k => delete bossPick[k]);
+  bossCardRow.innerHTML = "";
+  document.getElementById("bossPickCount").textContent = "0";
+  document.querySelectorAll("#bossPickDiff .opt-btn").forEach(b =>
+    b.classList.toggle("on", b.dataset.diff === settings.difficulty));
+  document.querySelectorAll("#bossPickNight .opt-btn").forEach(b =>
+    b.classList.toggle("on", (b.dataset.night === "on") === settings.night));
+  document.querySelectorAll("#bossPickMode .opt-btn").forEach(b =>
+    b.classList.toggle("on", b.dataset.mode === settings.mode));
+  const pool = CARD_POOL.filter(c => c.id !== "fortify");     // Boss 预选面板取消基地工事
+  pool.forEach(card => {
+    const el = document.createElement("div");
+    el.className = "card";
+    const cv = document.createElement("canvas");
+    cv.width = 40; cv.height = 40;
+    drawCardIcon(cv, card.icon);
+    const h3 = document.createElement("h3");
+    h3.textContent = card.name;
+    const lvEl = document.createElement("div");
+    lvEl.className = "lvl";
+    lvEl.textContent = "";
+    const p = document.createElement("p");
+    p.textContent = card.desc;
+    const pk = document.createElement("div");
+    pk.className = "pick";
+    pk.textContent = "点击选中";
+    el.appendChild(cv); el.appendChild(h3); el.appendChild(lvEl); el.appendChild(p); el.appendChild(pk);
+    const isLv = card.id in PICK_MAX_LV;
+    const pickCount = () => Object.values(bossPick).reduce((a, v) => a + v, 0);
+    const refreshCard = () => {
+      const lv = bossPick[card.id] || 0;
+      const on = lv > 0;
+      el.classList.toggle("picked", on);
+      if(isLv){
+        lvEl.textContent = on ? "Lv" + lv + "/" + PICK_MAX_LV[card.id] : "";
+        pk.textContent = on ? (lv >= PICK_MAX_LV[card.id] ? "已满级 · 点击取消" : "已选 Lv" + lv + " · 点击升级") : "点击选中";
+      } else {
+        pk.textContent = on ? "已选中" : "点击选中";
+      }
+      el.classList.toggle("disabled", !on && pickCount() >= 6);
+    };
+    el.addEventListener("click", () => {
+      const lv = bossPick[card.id] || 0;
+      if(isLv){
+        if(lv > 0){
+          if(lv >= PICK_MAX_LV[card.id]){ delete bossPick[card.id]; }     // 满级点击 = 取消
+          else if(pickCount() < 6){ bossPick[card.id] = lv + 1; }         // 未满级点击 = 升 1 级（占新名额）
+        } else {
+          if(pickCount() < 6){ bossPick[card.id] = 1; }                   // 未选点击 = 选中 Lv1
+        }
+      } else {
+        if(lv > 0) delete bossPick[card.id];
+        else if(pickCount() < 6) bossPick[card.id] = 1;
+      }
+      document.getElementById("bossPickCount").textContent = String(pickCount());
+      refreshCard();
+    });
+    refreshCard();
+    bossCardRow.appendChild(el);
+  });
+  bossCardOverlay.classList.remove("hidden");
+}
+function startBossBattle(){
+  const ids = Object.keys(bossPick);
+  bossCardOverlay.classList.add("hidden");
+  bossBattle(bossPickLevel, bossPickBossId);
+  ids.forEach(id => {
+    const lv = bossPick[id];
+    if(id === "multishot") game.buffs.multishot = Math.min(2, lv);
+    else if(id === "bomb"){ game.buffs.bomb = Math.min(3, lv); game.bombTip = 3; }
+    else if(id === "drone") game.buffs.drone = Math.min(3, lv);
+    else if(id === "barrier") game.buffs.barrier = true;
+    else if(id === "apfsds") game.buffs.apfsds = true;
+    else if(id === "he") game.buffs.he = true;
+  });
+  updateHUD();
+  saveGame();
+}
+document.querySelectorAll("#bossPickDiff .opt-btn").forEach(b => b.addEventListener("click", () => {
+  settings.difficulty = b.dataset.diff;
+  saveSettings();
+  document.querySelectorAll("#bossPickDiff .opt-btn").forEach(x =>
+    x.classList.toggle("on", x.dataset.diff === settings.difficulty));
+}));
+document.querySelectorAll("#bossPickNight .opt-btn").forEach(b => b.addEventListener("click", () => {
+  settings.night = b.dataset.night === "on";
+  saveSettings();
+  document.querySelectorAll("#bossPickNight .opt-btn").forEach(x =>
+    x.classList.toggle("on", (x.dataset.night === "on") === settings.night));
+}));
+document.querySelectorAll("#bossPickMode .opt-btn").forEach(b => b.addEventListener("click", () => {
+  settings.mode = b.dataset.mode;
+  saveSettings();
+  document.querySelectorAll("#bossPickMode .opt-btn").forEach(x =>
+    x.classList.toggle("on", x.dataset.mode === settings.mode));
+}));
+document.getElementById("btnBossPickStart").addEventListener("click", startBossBattle);
+document.getElementById("btnBossPickBack").addEventListener("click", () => {
+  bossCardOverlay.classList.add("hidden");
+  bossOverlay.classList.remove("hidden");
+});
+
+function newGame(){
+  SND.init(); SND.resume();
+  clearSave();
+  game = {
+    level: 1, score: 0, state: "playing", paused: false, overType: null,
+    buffs: { multishot: 0, barrier: false, bomb: 0, fortify: 0, drone: false, apfsds: false, he: false },
+    streak: 0,
+    livesLeft: LIVES_MAX[settings.lives]          // 按重生次数选项初始化
+  };
+  initLevel();
+  showScreen("game");
+  document.getElementById("btnPause").textContent = "暂停";
+  updateHUD();
+  SND.bgmStart("game");
+  saveGame();
+}
+function continueGame(){
+  let data = null;
+  try{ data = JSON.parse(localStorage.getItem(SAVE_KEY) || "null"); }catch(e){}
+  if(!data || !data.level){ showToast("暂无存档"); return; }
+  SND.init(); SND.resume();
+  // 恢复本局设置（难度/坦克/重生次数）
+  settings.difficulty = data.difficulty || settings.difficulty;
+  settings.tankType = data.tankType || settings.tankType;
+  settings.tankType2 = data.tankType2 || settings.tankType2 || "medium";
+  settings.lives = data.lives || settings.lives;
+  settings.mode = data.mode === "duo" ? "duo" : "single";
+  saveSettings();
+  game = {
+    level: data.level, score: data.score || 0, state: "playing", paused: false, overType: null,
+    buffs: Object.assign({ multishot: 0, barrier: false, bomb: 0, fortify: 0, drone: false, apfsds: false, he: false }, data.buffs || {}),
+    streak: data.streak || 0,
+    livesLeft: (typeof data.livesLeft === "number" ? data.livesLeft : LIVES_MAX[settings.lives]),
+    bossMode: !!data.bossIdOverride,
+    bossIdOverride: data.bossIdOverride || null
+  };
+  initLevel();
+  // 恢复本关进度：已击杀数与剩余敌人生成队列
+  game.killed = Math.min(data.killed || 0, game.killTarget);
+  if(Array.isArray(data.enemyQueue)) game.enemyQueue = data.enemyQueue.slice();
+  game.killTarget = game.enemyQueue.length + (game.bossPlan ? 1 : 0);
+  // 若 Boss 已生成且已击杀（killed 含 Boss），跳过警告直接不生成
+  if(game.killed >= game.killTarget){                 // 进度已满（异常存档）→ 从本关重开
+    game.killed = 0; game.enemyQueue = []; game.killTarget = 0;
+  }
+  showScreen("game");
+  document.getElementById("btnPause").textContent = "暂停";
+  updateHUD();
+  SND.bgmStart("game");
+}
+function quitToMenu(){
+  if(game && game.state === "playing") saveGame();   // 中途退出可继续（暂停中同样可存）
+  game = null;
+  if(toastTimer) clearTimeout(toastTimer);
+  if(toastEl) toastEl.style.display = "none";
+  for(const k in pressed) delete pressed[k];
+  cardOverlay.classList.add("hidden");
+  newGameOverlay.classList.add("hidden");
+  showScreen("title");
+  refreshTitleButtons();
+  SND.bgmStart("menu");
+}
+function refreshTitleButtons(){
+  const cont = document.getElementById("btnContinue");
+  if(hasSave()) cont.classList.remove("disabled");
+  else cont.classList.add("disabled");
+}
+
+/* ================= 主循环 ================= */
+function update(dt){
+  const g = game;
+  if(g.state === "clear" || g.state === "over") return;
+  if(g.bombTip > 0) g.bombTip -= dt;
+  // 画面抖动衰减
+  if(g.shake > 0){
+    g.shake -= dt;
+    if(g.shake > 0) canvas.style.transform = "translate(" + ((Math.random()-0.5)*7|0) + "px," + ((Math.random()-0.5)*7|0) + "px)";
+    else canvas.style.transform = "";
+  }
+  // Boss 警告倒计时，警告结束后入场；警告期间播放报警音效
+  if(g.bossWarn > 0){
+    g.bossWarn -= dt;
+    if(g.bossWarn <= 0 && g.bossPlan && !g.bossSpawned) spawnBoss(g.bossPlan);
+    g.alarmSnd -= dt;
+    if(g.alarmSnd <= 0){ g.alarmSnd = 0.9; SND.alarm(); }
+  }
+  // 普通敌人按队列生成
+  if(g.enemyQueue.length && g.concurrent < MAX_CONCURRENT){
+    g.spawnTimer -= dt;
+    if(g.spawnTimer <= 0){
+      const t = g.enemyQueue.shift();
+      if(!trySpawnEnemy(t)) g.enemyQueue.unshift(t);   // 出生位暂不可用 → 放回队列稍后重试，避免敌人永久丢失
+      g.spawnTimer = 0.5;
+    }
+  }
+  updatePlayer(dt);
+  // 技能持续音（引擎过载/冲撞碾压开启过程中）
+  const pp = g.player;
+  if(pp.skillActive > 0 && pp.skillType !== "positron" && !pp.dead){
+    pp.skillSnd -= dt;
+    if(pp.skillSnd <= 0){ pp.skillSnd = 0.45; SND.skillLoop(); }
+  }
+  // 无人机（Lv1-3）：10 秒后生成第一架；Lv1 击毁 5 秒重生、Lv2 立刻重生、Lv3 双机（第二架延迟 3 秒）
+  if(g.buffs.drone > 0 && !pp.dead){
+    const maxD = g.buffs.drone >= 3 ? 2 : 1;
+    if(g.drones.length < maxD && g.droneWait){
+      g.droneCd -= dt;
+      if(g.droneCd <= 0){
+        g.drones.push({ x: pp.x, y: pp.y, phase:"idle", t:0, vx:0, vy:0, buzzT:0, level:g.buffs.drone });
+        if(g.buffs.drone >= 3 && g.drones.length === 1){ g.droneCd = 3; g.droneWait = true; }   // 第一架后 3 秒出第二架
+        else g.droneWait = false;
+      }
+    }
+    for(const d of g.drones) updateDrone(d, dt);
+    g.drones = g.drones.filter(d => !d.dead);
+  }
+  for(const e of g.enemies) if(!e.dead && !e.isBoss) updateEnemy(e, dt);
+  for(const e of g.enemies) if(!e.dead && e.isBoss) updateBoss(e, dt);
+  updateBullets(dt);
+  for(const bm of [].concat(g.bombs)){
+    bm.t += dt;
+    if(bm.t >= (bm.isBoss ? bm.fuse : 5)) explodeBomb(bm);
+    else if(!bm.isBoss && bombTouched(bm)){   // 玩家炸弹被敌方/Boss 碰到 → 立即触发爆炸
+      explodeBomb(bm);
+      bm.t = 999;
+    }
+  }
+  g.bombs = g.bombs.filter(bm => bm.t < (bm.isBoss ? bm.fuse : 5));
+  if(g.laser){ g.laser.t += dt; if(g.laser.t > 0.35) g.laser = null; }
+  for(const ef of g.effects) ef.t += dt;
+  g.effects = g.effects.filter(ef => ef.t < ef.dur);
+  g.enemies = g.enemies.filter(e => !e.dead);
+  g.bullets = g.bullets.filter(b => !b.dead);
+  bossTouchPlayer();
+  resolveOverlaps();
+  updateHUD();
+}
+/* 防御性坦克重叠修正：任何残留重叠都把后一辆弹开到空地 */
+function resolveOverlaps(){
+  const list = [game.player].concat(game.player2 ? [game.player2] : [], game.enemies).filter(t => t && !t.dead);
+  for(let i=0; i<list.length; i++){
+    for(let j=i+1; j<list.length; j++){
+      const a = list[i], b = list[j];
+      const ra = tankRect(a), rb = tankRect(b);
+      const overlap = ra.x < rb.x + rb.w && ra.x + ra.w > rb.x && ra.y < rb.y + rb.h && ra.y + ra.h > rb.y;
+      if(!overlap) continue;
+      if(a.isBoss || b.isBoss){
+        // 玩家与 Boss 重叠 → 玩家损坏；Boss 与普通敌人重叠 → 弹开小敌人
+        if(a.isPlayer){ destroyTank(a, a === game.player); return; }
+        if(b.isPlayer){ destroyTank(b, b === game.player); return; }
+        if(a.isBoss && !b.isBoss) pushEnemyAway(b, a);
+        else if(b.isBoss && !a.isBoss) pushEnemyAway(a, b);
+        continue;
+      }
+      if(a.isPlayer || b.isPlayer) continue;     // 玩家相关不弹开（玩家移动被阻挡，敌人保持原位）
+      // 普通敌人互相重叠：不弹开（避免来回推挤造成同格原地抽搐）——碰撞由 tryMove 矩形阻挡，trackStuck 换向/瞬移兜底
+      continue;
+    }
+  }
+}
+
+/* ================= 夜战：视野计算 ================= */
+/* 以玩家为中心 BFS 扩散（半径 8 格）：砖(1)/钢(2) 本身可见但阻挡视线，其后的格子不可见；
+   草丛/沼泽/水不阻挡；大本营区域始终可见。视野随玩家移动与砖块被破坏动态变化。 */
+function computeVisibility(g){
+  const vis = g.visGrid || (g.visGrid = []);
+  for(let r=0; r<ROWS; r++){
+    if(!vis[r]) vis[r] = new Array(COLS).fill(false);
+    else for(let c=0; c<COLS; c++) vis[r][c] = false;
+  }
+  const pc = Math.floor((g.player.x + 16) / CELL), pr = Math.floor((g.player.y + 16) / CELL);
+  const R = 8, R2 = R*R + 0.01;
+  const queue = [[pc, pr]];
+  vis[pr][pc] = true;
+  const seen = new Set([pr * COLS + pc]);
+  while(queue.length){
+    const [c, r] = queue.shift();
+    for(const [dc, dr] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      const nc = c + dc, nr = r + dr;
+      if(nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) continue;
+      const key = nr * COLS + nc;
+      if(seen.has(key)) continue;
+      seen.add(key);
+      const ddx = nc - pc, ddy = nr - pr;
+      if(ddx*ddx + ddy*ddy > R2) continue;
+      const v = g.map[nr][nc];
+      vis[nr][nc] = true;                 // 遮挡格本身可见
+      if(v === 1 || v === 2) continue;    // 砖/钢：阻挡视线，不再向外扩散
+      queue.push([nc, nr]);
+    }
+  }
+  // 大本营区域始终可见（己方设施）
+  for(let dr=-1; dr<=1; dr++) for(let dc=-1; dc<=1; dc++){
+    const c = 9+dc, r = 17+dr;
+    if(c >= 0 && c < COLS && r >= 0 && r < ROWS) vis[r][c] = true;
+  }
+  return vis;
+}
+/* 夜战：敌方单位是否可见（所在格在视野内；战舰 2×2 任一格可见即可见；列车按车头格） */
+function enemyVisible(e, vis){
+  if(!vis) return true;
+  if(e.isBoss && e.bossId !== "train"){
+    const c = Math.floor(e.x / CELL), r = Math.floor(e.y / CELL);
+    for(let dr=0; dr<bossGridH(e); dr++){
+      for(let dc=0; dc<bossGridW(e); dc++){
+        if(vis[r+dr] && vis[r+dr][c+dc]) return true;
+      }
+    }
+    return false;
+  }
+  const c = Math.floor((e.x + 16) / CELL), r = Math.floor((e.y + 16) / CELL);
+  return !!(vis[r] && vis[r][c]);
+}
+
+/* ================= 渲染 ================= */
+function render(){
+  const g = game;
+  ctx.fillStyle = "#0b0b10";
+  ctx.fillRect(0, 0, CW, CH);
+  ctx.strokeStyle = "rgba(255,255,255,.045)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for(let i=0; i<=COLS; i++){ ctx.moveTo(i*CELL+.5, 0); ctx.lineTo(i*CELL+.5, CH); }
+  for(let i=0; i<=ROWS; i++){ ctx.moveTo(0, i*CELL+.5); ctx.lineTo(CW, i*CELL+.5); }
+  ctx.stroke();
+  for(let r=0; r<ROWS; r++){
+    for(let c=0; c<COLS; c++){
+      const v = g.map[r][c];
+      if(v === 1) drawBrick(c*CELL, r*CELL);
+      else if(v === 2) drawSteel(c*CELL, r*CELL);
+      else if(v === 4) drawBush(c*CELL, r*CELL);
+      else if(v === 5) drawSwamp(c*CELL, r*CELL);
+      else if(v === 6) drawWater(c*CELL, r*CELL);
+      else if(v >= 8 && v <= 10) drawIron(c*CELL, r*CELL, v - 7);
+    }
+  }
+  // 大本营
+  if(g.baseAlive){
+    drawSprite(ctx, spriteFor("base", 0), 9*CELL, 17*CELL, 2, PAL_BASE);
+  } else {
+    ctx.fillStyle = "#3a3a44";
+    ctx.fillRect(9*CELL+6, 17*CELL+6, 20, 20);
+    ctx.fillStyle = "#55555f";
+    ctx.fillRect(9*CELL+10, 17*CELL+10, 12, 12);
+  }
+  // 炸弹
+  for(const bm of g.bombs){
+    // Boss 抛洒的炸弹：前 0.5 秒显示抛射轨迹（从 Boss 飞向落点）
+    let px = bm.cx*CELL, py = bm.cy*CELL;
+    if(bm.isBoss && bm.from && bm.t < 0.5){
+      const k = bm.t / 0.5;
+      px = bm.from.x + (bm.cx*CELL + 16 - bm.from.x) * k - 16;
+      py = bm.from.y + (bm.cy*CELL + 16 - bm.from.y) * k - 16;
+    }
+    ctx.fillStyle = "#8f1f1f";
+    ctx.fillRect(px+9, py+9, 14, 14);
+    ctx.fillStyle = "#c83838";
+    ctx.fillRect(px+11, py+11, 10, 10);
+    ctx.fillStyle = "#e84545";
+    ctx.fillRect(px+13, py+13, 6, 6);
+    ctx.fillStyle = "#ffd54d";
+    ctx.fillRect(px+19, py+7, 3, 3);
+    ctx.fillStyle = "#5c646d";
+    ctx.fillRect(px+16, py+8, 6, 2);
+    const blinkT = bm.isBoss ? 1.0 : 4.2;
+    if(bm.t > blinkT && Math.floor(bm.t*6) % 2 === 0){
+      ctx.fillStyle = "#ffd54d";
+      ctx.fillRect(px+9, py+9, 14, 14);
+    }
+  }
+  // 夜战：先计算视野（玩家移动/砖块被破坏 → 可见区域动态变化）
+  if(settings.night) computeVisibility(g);
+  // 敌人（含 Boss）
+  for(const e of g.enemies){
+    if(settings.night && !enemyVisible(e, g.visGrid)) continue;   // 夜战：不可见敌人不绘制
+    if(e.isBoss){
+      if(e.bossId === "ship") drawBossShip(e);
+      else if(e.bossId === "godzilla") drawBossGodzilla(e);
+      else drawBossTrain(e);
+    } else {
+      drawSprite(ctx, spriteFor(e.spriteKey, e.dir), e.x, e.y, 2, e.pal || g.diffPal);
+      for(let i=0; i<Math.min(e.hp, 8); i++){
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(e.x + 10 + i*4, e.y + 8, 3, 3);
+      }
+    }
+  }
+  // 夜战：不可见区域暗显（可见区亮显）；玩家/大本营/子弹/特效不受影响
+  if(settings.night && g.visGrid){
+    ctx.fillStyle = "rgba(2,3,10,0.72)";
+    for(let r=0; r<ROWS; r++){
+      for(let c=0; c<COLS; c++){
+        if(!g.visGrid[r][c]) ctx.fillRect(c*CELL, r*CELL, CELL, CELL);
+      }
+    }
+  }
+  // 玩家（P1/P2 共用绘制）
+  drawPlayerUnit(g.player);
+  if(g.player2) drawPlayerUnit(g.player2);
+  // 草丛遮蔽：草丛格上的坦克被半透明草叶覆盖
+  const overlayTanks = g.enemies.concat(!g.player.dead ? [g.player] : []);
+  if(g.player2 && !g.player2.dead) overlayTanks.push(g.player2);
+  // 草丛遮蔽：草丛格上的坦克被半透明草叶覆盖
+  for(const t of overlayTanks){
+    const {c, r} = cellOf(t);
+    if(g.map[r][c] === 4){
+      ctx.globalAlpha = 0.55;
+      drawBush(c*CELL, r*CELL);
+      ctx.globalAlpha = 1;
+    }
+  }
+  // 无人机（四旋翼，图层在坦克之上；上下起伏 + 左右飞行时倾斜；星级标识 Lv1-3）
+  if(g.drones && (!g.player.dead || (g.player2 && !g.player2.dead))){
+    for(const d of g.drones){
+      const bob = Math.sin(d.t * 9) * 2;
+      const tilt = d.vx ? Math.max(-0.35, Math.min(0.35, d.vx * 0.35)) : 0;
+      ctx.save();
+      ctx.translate(d.x + 8, d.y + 8 + bob);
+      ctx.rotate(tilt);
+      const spin = Math.floor(d.t * 40) % 2;
+      for(const [sx, sy] of [[-7,-6],[7,-6],[-7,6],[7,6]]){   // 四旋翼电机+桨叶
+        ctx.fillStyle = "#2c3038";
+        ctx.fillRect(sx-2, sy-2, 4, 4);
+        ctx.fillStyle = "rgba(196,204,212,.9)";
+        ctx.fillRect(sx-6 + spin*3, sy-1, 12, 2);
+      }
+      ctx.fillStyle = "#1c1c24";                               // 机体
+      ctx.fillRect(-5, -3, 10, 6);
+      ctx.fillStyle = "#4a5058";
+      ctx.fillRect(-3, -1, 6, 2);
+      ctx.fillStyle = "#ffd54d";                               // 指示灯
+      ctx.fillRect(3, -2, 2, 2);
+      // 星级：机体上方 1-3 颗黄星
+      const stars = Math.max(1, Math.min(3, d.level || 1));
+      ctx.fillStyle = "#ffd54d";
+      for(let i=0; i<stars; i++) ctx.fillRect(-7 + i*5, -10, 4, 4);
+      ctx.restore();
+    }
+  }
+  // 炮弹（细长造型，沿飞行方向拉伸）
+  for(const b of g.bullets){
+    const col1 = b.owner === "player" ? "#ffd54d" : "#ff7a5c";
+    const col2 = b.owner === "player" ? "#fff6c8" : "#ffe9e0";
+    if(b.ammo === "apfsds"){ // 穿甲弹：细长杆 + 尖头（青白）
+      const cx = b.x + 4, cy = b.y + 4;
+      if(b.dx !== 0){
+        ctx.fillStyle = "#cfe9ff";
+        ctx.fillRect(b.dx > 0 ? b.x - 4 : b.x - 12, b.y + 3, 16, 2);
+        ctx.fillStyle = "#8fd4ff";
+        ctx.beginPath();
+        if(b.dx > 0){ ctx.moveTo(b.x + 12, b.y + 1); ctx.lineTo(b.x + 20, b.y + 4); ctx.lineTo(b.x + 12, b.y + 7); }
+        else { ctx.moveTo(b.x - 12, b.y + 1); ctx.lineTo(b.x - 20, b.y + 4); ctx.lineTo(b.x - 12, b.y + 7); }
+        ctx.fill();
+      } else {
+        ctx.fillStyle = "#cfe9ff";
+        ctx.fillRect(b.x + 3, b.dy > 0 ? b.y - 4 : b.y - 12, 2, 16);
+        ctx.fillStyle = "#8fd4ff";
+        ctx.beginPath();
+        if(b.dy > 0){ ctx.moveTo(b.x + 1, b.y + 12); ctx.lineTo(b.x + 4, b.y + 20); ctx.lineTo(b.x + 7, b.y + 12); }
+        else { ctx.moveTo(b.x + 1, b.y - 12); ctx.lineTo(b.x + 4, b.y - 20); ctx.lineTo(b.x + 7, b.y - 12); }
+        ctx.fill();
+      }
+    } else if(b.ammo === "he"){ // 榴弹：圆形弹头（橙红）
+      ctx.fillStyle = "#ff8a3d";
+      ctx.beginPath(); ctx.arc(b.x + 4, b.y + 4, 5, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = "#ffd54d";
+      ctx.beginPath(); ctx.arc(b.x + 4, b.y + 4, 2.4, 0, Math.PI*2); ctx.fill();
+    } else if(b.laser){ // 列车车头激光：长 3 格光束
+      const len = 3*CELL;
+      const bx = b.dx !== 0 ? (b.dx > 0 ? b.x - len : b.x) : b.x - 2;
+      const by = b.dy !== 0 ? (b.dy > 0 ? b.y - len : b.y) : b.y - 2;
+      ctx.fillStyle = "rgba(255,90,80,.75)";
+      if(b.dx !== 0) ctx.fillRect(bx, by, len + 8, 8); else ctx.fillRect(bx, by, 8, len + 8);
+      ctx.fillStyle = col1;
+      if(b.dx !== 0) ctx.fillRect(bx, by + 2, len + 8, 4); else ctx.fillRect(bx + 2, by, 4, len + 8);
+      ctx.fillStyle = col2;
+      if(b.dx !== 0) ctx.fillRect(bx, by + 3, len + 8, 2); else ctx.fillRect(bx + 3, by, 2, len + 8);
+    } else if(b.dx !== 0){ // 水平飞行：横长竖窄
+      const bx = b.dx > 0 ? b.x - 2 : b.x - 6, by = b.y + 2;
+      ctx.fillStyle = col1;
+      ctx.fillRect(bx, by, 12, 4);
+      ctx.fillStyle = col2;
+      ctx.fillRect(bx, by + 1, 12, 2);
+    } else {        // 垂直飞行：竖长横窄
+      const bx = b.x + 2, by = b.dy > 0 ? b.y - 2 : b.y - 6;
+      ctx.fillStyle = col1;
+      ctx.fillRect(bx, by, 4, 12);
+      ctx.fillStyle = col2;
+      ctx.fillRect(bx + 1, by, 2, 12);
+    }
+  }
+  // 阳电子炮激光
+  if(g.laser){
+    const [dx, dy] = DIRS[g.laser.dir];
+    const x0 = g.laser.c*CELL + 16, y0 = g.laser.r*CELL + 16;
+    ctx.fillStyle = "rgba(255,220,90,.85)";
+    if(dy < 0) ctx.fillRect(x0-6, 0, 12, y0);
+    if(dy > 0) ctx.fillRect(x0-6, y0, 12, CH-y0);
+    if(dx < 0) ctx.fillRect(0, y0-6, x0, 12);
+    if(dx > 0) ctx.fillRect(x0, y0-6, CW-x0, 12);
+    ctx.fillStyle = "rgba(255,255,255,.9)";
+    if(dy !== 0) ctx.fillRect(x0-2, dy<0?0:y0, 4, dy<0?y0:CH-y0);
+    if(dx !== 0) ctx.fillRect(dx<0?0:x0, y0-2, dx<0?x0:CW-x0, 4);
+  }
+  // 效果
+  for(const ef of g.effects){
+    const p1 = Math.min(ef.t / ef.dur, 1);
+    if(ef.type === "boom"){
+      const scale = ef.big === 3 ? 2.2 : ef.big === 2 ? 1.5 : 1;
+      const r = (6 + 26 * p1) * scale;
+      ctx.globalAlpha = 1 - p1;
+      ctx.fillStyle = "#e8723a"; ctx.fillRect(ef.x-r, ef.y-r, r*2, r*2);
+      ctx.fillStyle = "#ffd54d"; ctx.fillRect(ef.x-r*0.6, ef.y-r*0.6, r*1.2, r*1.2);
+      ctx.fillStyle = "#fff";     ctx.fillRect(ef.x-4, ef.y-4, 8, 8);
+      ctx.globalAlpha = 1;
+      if(ef.big >= 2){  // 高等级爆炸：扩散冲击环标示爆炸范围
+        ctx.globalAlpha = (1 - p1) * 0.7;
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(ef.x - r*1.15, ef.y - r*1.15, r*2.3, r*2.3);
+        ctx.globalAlpha = 1;
+      }
+    } else if(ef.type === "spark"){
+      // 打击火花：碎片向四周飞溅并渐隐
+      ctx.globalAlpha = 1 - p1;
+      for(const pt of ef.parts){
+        ctx.fillStyle = pt.c;
+        const s = p1 < 0.6 ? 3 : 2;
+        ctx.fillRect(ef.x + pt.dx*p1*14 - (s>>1), ef.y + pt.dy*p1*14 - (s>>1), s, s);
+      }
+      ctx.globalAlpha = 1;
+    } else if(ef.type === "barrierBreak"){
+      // 装甲屏障碎裂：中央爆闪 + 护盾碎片飞散渐隐
+      const t = Math.min(ef.t / ef.dur, 1);
+      ctx.globalAlpha = 1 - t;
+      ctx.fillStyle = "#bfe3ff";
+      const fr = 14 * (1 - t) + 2;
+      ctx.fillRect(ef.x - fr, ef.y - fr, fr*2, fr*2);
+      ctx.fillStyle = "#6fc3ff";
+      ctx.fillRect(ef.x - fr*0.5, ef.y - fr*0.5, fr, fr);
+      for(const pt of ef.parts){
+        ctx.fillStyle = pt.c;
+        ctx.fillRect(ef.x + pt.dx*t*32 - pt.s/2, ef.y + pt.dy*t*32 - pt.s/2, pt.s, pt.s);
+      }
+      ctx.globalAlpha = 1;
+    } else if(ef.type === "steam"){
+      // 蒸汽粒子：白烟上飘渐隐
+      ctx.globalAlpha = (1 - p1) * 0.55;
+      ctx.fillStyle = "#cfd4da";
+      const sr = 2 + p1*6;
+      ctx.fillRect(ef.x + (ef.dx||0)*p1 - sr/2, ef.y + (ef.dy||0)*p1 - sr/2, sr, sr);
+      ctx.globalAlpha = 1;
+    } else if(ef.type === "mud"){
+      // 泥土/泥浆/水花：从坦克尾部向后抛洒
+      ctx.globalAlpha = (1 - p1) * 0.9;
+      for(const pt of ef.parts){
+        ctx.fillStyle = pt.c;
+        ctx.fillRect(ef.x + pt.dx*p1*12 - 1, ef.y + pt.dy*p1*12 - 1, 2, 2);
+      }
+      ctx.globalAlpha = 1;
+    } else if(ef.type === "brick"){
+      for(const pt of ef.parts){
+        ctx.fillStyle = "#a34a22";
+        ctx.fillRect(ef.x + pt.dx*p1*16 - 3, ef.y + pt.dy*p1*16 - 3, 6, 6);
+      }
+    } else if(ef.type === "spawn"){
+      ctx.globalAlpha = 1 - p1;
+      ctx.strokeStyle = "#ffd54d";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(ef.x - 14 - p1*8, ef.y - 14 - p1*8, 28 + p1*16, 28 + p1*16);
+      ctx.globalAlpha = 1;
+    }
+  }
+  // Boss 出现警告（红字闪烁）
+  if(g.bossWarn > 0 && Math.floor(g.bossWarn*4) % 2 === 0){
+    ctx.font = "bold 30px 'Microsoft YaHei',sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(0,0,0,.55)";
+    ctx.fillRect(0, CH/2 - 34, CW, 44);
+    ctx.strokeStyle = "#e84545";
+    ctx.lineWidth = 4;
+    ctx.strokeText("警告！Boss 即将来袭！", CW/2, CH/2 + 4);
+    ctx.fillStyle = "#e84545";
+    ctx.fillText("警告！Boss 即将来袭！", CW/2, CH/2 + 4);
+  }
+  // 获得炸弹后的按键提示（持续 3 秒）
+  if(g.bombTip > 0){
+    ctx.font = "bold 17px 'Microsoft YaHei',sans-serif";
+    ctx.textAlign = "center";
+    const bx = CW/2, by = 30;
+    ctx.fillStyle = "rgba(0,0,0,.6)";
+    ctx.fillRect(bx - 150, by - 16, 300, 24);
+    ctx.strokeStyle = "#ffd54d";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(bx - 150, by - 16, 300, 24);
+    ctx.fillStyle = "#ffd54d";
+    ctx.fillText("炸弹：按 " + keyLabel(settings.keys.bomb) + " 部署！", bx, by + 4);
+  }
+}
+/* ================= Boss 渲染 ================= */
+/* 像素五角星：坦克升级徽记 */
+function drawStar(ctx, x, y, s){
+  const cx = x + s/2, cy = y + s/2;
+  ctx.fillStyle = "#1a1a22";
+  ctx.beginPath();
+  for(let i=0; i<5; i++){
+    const a = -Math.PI/2 + i*2*Math.PI/5;
+    const a2 = a + Math.PI/5;
+    const px = cx + Math.cos(a)*s/2, py = cy + Math.sin(a)*s/2;
+    const px2 = cx + Math.cos(a2)*s*0.22, py2 = cy + Math.sin(a2)*s*0.22;
+    if(i === 0){ ctx.moveTo(px, py); ctx.lineTo(px2, py2); }
+    else { ctx.lineTo(px, py); ctx.lineTo(px2, py2); }
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#ffd54d";
+  ctx.beginPath();
+  for(let i=0; i<5; i++){
+    const a = -Math.PI/2 + i*2*Math.PI/5;
+    const a2 = a + Math.PI/5;
+    const px = cx + Math.cos(a)*s*0.34, py = cy + Math.sin(a)*s*0.34;
+    const px2 = cx + Math.cos(a2)*s*0.16, py2 = cy + Math.sin(a2)*s*0.16;
+    if(i === 0){ ctx.moveTo(px, py); ctx.lineTo(px2, py2); }
+    else { ctx.lineTo(px, py); ctx.lineTo(px2, py2); }
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+function bossNameTag(e, cx, cy){
+  ctx.font = "bold 15px 'Microsoft YaHei',sans-serif";
+  ctx.textAlign = "center";
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "#1a0a0a";
+  ctx.strokeText(e.name, cx, cy);
+  ctx.fillStyle = "#ff4d4d";
+  ctx.fillText(e.name, cx, cy);
+}
+function drawBossGodzilla(e){
+  const px = e.x, py = e.y;
+  // 原子吐息激光（先画在身体下，叠在身体上会被覆盖，故提前画在身体前）
+  if(e.sweep > 0){
+    const end = godzillaBreathEnd(e);
+    const mx = e.x + 48, my = e.y + 92;
+    const grad = ctx.createLinearGradient(mx, my, end.x, end.y);
+    grad.addColorStop(0, "rgba(160,240,255,0.95)");
+    grad.addColorStop(1, "rgba(255,255,255,0.35)");
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 7;
+    ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(end.x, end.y); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.9)";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(end.x, end.y); ctx.stroke();
+    // 吐息起点火花
+    ctx.fillStyle = "rgba(255,235,150,0.9)";
+    for(let i=0; i<5; i++){
+      const a = e.sweepAng + (i-2)*0.35;
+      ctx.fillRect(mx + Math.cos(a)*26 + Math.random()*4 - 2, my + Math.sin(a)*26 + Math.random()*4 - 2, 4, 4);
+    }
+    // 激光命中光点
+    const t = performance.now() / 90;
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    const midx = (mx + end.x)/2 + Math.cos(t)*6, midy = (my + end.y)/2 + Math.sin(t)*6;
+    ctx.fillRect(midx-3, midy-3, 6, 6);
+  }
+  // ---- 机械哥斯拉俯视：3×3 格（96×96），头朝下，头/身体/手臂/尾巴分明 ----
+  // ===== 尾巴（上方第 1 行）：渐细机械尾 + 双侧尾鳍 =====
+  ctx.fillStyle = "#39424c";
+  ctx.fillRect(px + 38, py + 2, 20, 6);            // 尾尖
+  ctx.fillStyle = "#ff6b6b";
+  ctx.fillRect(px + 46, py + 4, 4, 4);             // 尾尖传感器
+  ctx.fillStyle = "#2e353d";
+  ctx.fillRect(px + 34, py + 8, 28, 6);
+  ctx.fillRect(px + 30, py + 14, 36, 6);
+  ctx.fillRect(px + 26, py + 20, 44, 7);
+  ctx.fillStyle = "#4d565f";
+  ctx.fillRect(px + 32, py + 10, 32, 4);
+  ctx.fillRect(px + 28, py + 16, 40, 4);
+  // 尾鳍（两侧展开）
+  ctx.fillStyle = "#333b44";
+  ctx.fillRect(px + 6, py + 12, 20, 7);
+  ctx.fillRect(px + 70, py + 12, 20, 7);
+  ctx.fillStyle = "#46505c";
+  ctx.fillRect(px + 8, py + 14, 16, 3);
+  ctx.fillRect(px + 72, py + 14, 16, 3);
+  // ===== 身体（中部）：大型装甲躯干 + 背鳍 + 铆钉 =====
+  ctx.fillStyle = "#3d444d";
+  ctx.fillRect(px + 8, py + 26, 80, 38);
+  ctx.fillStyle = "#4d565f";
+  ctx.fillRect(px + 14, py + 32, 68, 28);
+  // 背鳍（中央中脊，红点）
+  ctx.fillStyle = "#2b323a";
+  for(let i=0; i<7; i++){ ctx.fillRect(px + 16 + i*9, py + 28, 6, 12); }
+  ctx.fillStyle = "#e84545";
+  for(let i=0; i<7; i++){ ctx.fillRect(px + 17 + i*9, py + 28, 2, 9); }
+  // 装甲板接缝
+  ctx.fillStyle = "#39424c";
+  ctx.fillRect(px + 16, py + 44, 26, 3);
+  ctx.fillRect(px + 54, py + 44, 26, 3);
+  ctx.fillStyle = "#5c646d";
+  for(let i=0; i<7; i++){ ctx.fillRect(px + 18 + i*9, py + 50, 3, 3); }
+  // ===== 手臂（两侧）：粗壮机械臂 + 三爪 =====
+  ctx.fillStyle = "#2e353d";
+  ctx.fillRect(px + 0, py + 36, 12, 20);
+  ctx.fillRect(px + 84, py + 36, 12, 20);
+  ctx.fillStyle = "#4d565f";
+  ctx.fillRect(px + 2, py + 40, 8, 12);
+  ctx.fillRect(px + 86, py + 40, 8, 12);
+  // 爪（三指）
+  ctx.fillStyle = "#23282f";
+  ctx.fillRect(px + 0, py + 54, 4, 8);
+  ctx.fillRect(px + 5, py + 56, 4, 6);
+  ctx.fillRect(px + 10, py + 54, 4, 8);
+  ctx.fillRect(px + 82, py + 54, 4, 8);
+  ctx.fillRect(px + 87, py + 56, 4, 6);
+  ctx.fillRect(px + 92, py + 54, 4, 8);
+  ctx.fillStyle = "#6b7683";
+  ctx.fillRect(px + 1, py + 55, 2, 6);
+  ctx.fillRect(px + 11, py + 55, 2, 6);
+  ctx.fillRect(px + 83, py + 55, 2, 6);
+  ctx.fillRect(px + 93, py + 55, 2, 6);
+  // ===== 火炮（右臂上方加农炮管）=====
+  ctx.fillStyle = "#2b323a";
+  ctx.fillRect(px + 86, py + 30, 10, 22);
+  ctx.fillStyle = "#4d565f";
+  ctx.fillRect(px + 88, py + 32, 6, 16);
+  ctx.fillStyle = "#23282f";
+  ctx.fillRect(px + 88, py + 50, 6, 5);           // 炮口
+  // ===== 头（下方第 3 行）：宽头 + 尖角 + 下颚 =====
+  ctx.fillStyle = "#3d444d";
+  ctx.fillRect(px + 18, py + 62, 60, 26);
+  ctx.fillStyle = "#4d565f";
+  ctx.fillRect(px + 24, py + 66, 48, 18);
+  // 头侧尖角
+  ctx.fillStyle = "#23282f";
+  ctx.fillRect(px + 14, py + 62, 8, 12);
+  ctx.fillRect(px + 74, py + 62, 8, 12);
+  ctx.fillStyle = "#46505c";
+  ctx.fillRect(px + 16, py + 64, 4, 8);
+  ctx.fillRect(px + 76, py + 64, 4, 8);
+  // 下颚（嘴部，吐息口）
+  ctx.fillStyle = "#2e353d";
+  ctx.fillRect(px + 26, py + 82, 44, 10);
+  ctx.fillStyle = "#ff6b6b";
+  ctx.fillRect(px + 32, py + 86, 32, 5);          // 喉部红光
+  // 眼睛（黄色）
+  ctx.fillStyle = "#ffd54d";
+  ctx.fillRect(px + 32, py + 70, 6, 5);
+  ctx.fillRect(px + 58, py + 70, 6, 5);
+  ctx.fillStyle = "#7a5c00";
+  ctx.fillRect(px + 34, py + 72, 3, 2);
+  ctx.fillRect(px + 60, py + 72, 3, 2);
+  // 机械天线
+  ctx.fillStyle = "#5c646d";
+  ctx.fillRect(px + 45, py + 26, 3, 8);
+  ctx.fillStyle = "#e84545";
+  ctx.fillRect(px + 44, py + 22, 5, 4);
+  // ===== 护盾（银色金属反光）=====
+  if(e.shieldT > 0){
+    const ft = performance.now() / 50;
+    ctx.fillStyle = "rgba(190,205,220,0.32)";
+    ctx.fillRect(px + 2, py + 2, 92, 92);
+    // 金属反光条（左右移动高光）
+    const barX = px + 6 + (ft % 70);
+    ctx.fillStyle = "rgba(235,242,250,0.55)";
+    ctx.fillRect(barX, py + 4, 8, 88);
+    ctx.fillStyle = "rgba(255,255,255,0.25)";
+    ctx.fillRect(barX + 12, py + 4, 3, 88);
+    ctx.strokeStyle = "rgba(220,232,245,0.8)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(px + 2, py + 2, 92, 92);
+  }
+  // 红闪前摇：身体闪烁红光（护盾时不叠加红光，避免混淆）
+  if(e.shieldT <= 0 && e.warnT > 0 && Math.floor(e.redT * 12) % 2 === 0){
+    ctx.fillStyle = "rgba(255,40,40,0.35)";
+    ctx.fillRect(px + 2, py + 2, 92, 92);
+    ctx.fillStyle = "rgba(255,80,80,0.5)";
+    ctx.fillRect(px + 18, py + 62, 60, 30);
+  }
+  // 警告提示（红闪期间显示）
+  if(e.warnT > 0){
+    ctx.fillStyle = "#ff5050";
+    ctx.font = "bold 12px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("吐息！", e.x + 48, e.y - 10);
+  }
+  bossNameTag(e, e.x + 48, e.y - 8);
+  // 血条
+  const bw = 88, bh = 5, bx = e.x + 4, by = e.y + 96;
+  ctx.fillStyle = "#1a1a22";
+  ctx.fillRect(bx, by, bw, bh);
+  ctx.fillStyle = "#e84545";
+  ctx.fillRect(bx, by, Math.max(0, Math.round(bw * Math.max(0, e.hp / e.maxHp))), bh);
+}
+function drawBossShip(e){
+  const px = e.x, py = e.y;
+  // 船体（64×64 像素战舰）
+  ctx.fillStyle = "#4a3a2a";                       // 船底阴影
+  ctx.fillRect(px+2, py+6, 60, 56);
+  ctx.fillStyle = "#6b5138";                       // 船身
+  ctx.fillRect(px, py+2, 64, 58);
+  ctx.fillStyle = "#7d6247";                       // 甲板
+  ctx.fillRect(px+4, py+6, 56, 50);
+  ctx.fillStyle = "#8f7253";                       // 甲板中脊
+  ctx.fillRect(px+10, py+10, 44, 4);
+  ctx.fillRect(px+10, py+40, 44, 4);
+  // 炮塔群
+  ctx.fillStyle = "#3d2f22";
+  ctx.fillRect(px+4, py+20, 16, 16);               // 左炮塔
+  ctx.fillRect(px+44, py+20, 16, 16);              // 右炮塔
+  ctx.fillStyle = "#55422f";
+  ctx.fillRect(px+8, py+24, 8, 8);
+  ctx.fillRect(px+48, py+24, 8, 8);
+  // 主炮管
+  ctx.fillStyle = "#2e241a";
+  ctx.fillRect(px+20, py+22, 24, 4);
+  ctx.fillRect(px+20, py+32, 24, 4);
+  // 舰桥
+  ctx.fillStyle = "#5a4632";
+  ctx.fillRect(px+24, py+14, 16, 10);
+  ctx.fillStyle = "#ffd54d";
+  ctx.fillRect(px+27, py+16, 3, 3);
+  ctx.fillRect(px+34, py+16, 3, 3);
+  // 烟囱（蒸汽粒子出口）
+  ctx.fillStyle = "#2c2218";
+  ctx.fillRect(px+26, py+8, 5, 6);
+  ctx.fillRect(px+33, py+8, 5, 6);
+  // 履带裙板
+  ctx.fillStyle = "#3a2f22";
+  ctx.fillRect(px, py+46, 64, 8);
+  ctx.fillStyle = "#57432c";
+  for(let i=0; i<8; i++) ctx.fillRect(px+2+i*8, py+48, 6, 4);
+  // 船首撞角
+  ctx.fillStyle = "#8a6b48";
+  ctx.fillRect(px+26, py, 12, 4);
+  bossNameTag(e, px+32, py-8);
+  // 血条
+  const bw = 56, bh = 5, bx = px+4, by = py+64;
+  ctx.fillStyle = "#1a1a22";
+  ctx.fillRect(bx, by, bw, bh);
+  ctx.fillStyle = "#e84545";
+  ctx.fillRect(bx, by, Math.max(0, Math.round(bw * Math.max(0, e.hp / e.maxHp))), bh);
+}
+function drawBossTrain(e){
+  // 车头（32×32 装甲火车头）
+  const px = e.x, py = e.y;
+  ctx.fillStyle = "#3a1f1f";
+  ctx.fillRect(px+2, py+4, 28, 26);
+  ctx.fillStyle = "#8f2f2f";                       // 红色车头
+  ctx.fillRect(px, py+2, 32, 30);
+  ctx.fillStyle = "#a53a3a";
+  ctx.fillRect(px+2, py+6, 28, 22);
+  ctx.fillStyle = "#ffd54d";                       // 车灯
+  ctx.fillRect(px+12, py+4, 8, 4);
+  ctx.fillStyle = "#2c1f1f";                       // 烟囱
+  ctx.fillRect(px+6, py-2, 6, 6);
+  ctx.fillStyle = "#4a2a2a";                       // 排障器
+  ctx.fillRect(px+2, py+26, 28, 4);
+  ctx.fillStyle = "#1c1414";
+  for(let i=0; i<5; i++) ctx.fillRect(px+3+i*6, py+28, 4, 2);
+  // 蓄力警告
+  if(e.laserCharge > 0){
+    ctx.fillStyle = Math.floor(e.laserCharge*6) % 2 === 0 ? "#ff4d4d" : "#fff";
+    ctx.fillRect(px+10, py-8, 12, 4);
+  }
+  bossNameTag(e, px+16, py-14);
+  // 车头血条
+  const bw = 28, bh = 4, bx = px+2, by = py+32;
+  ctx.fillStyle = "#1a1a22";
+  ctx.fillRect(bx, by, bw, bh);
+  ctx.fillStyle = "#e84545";
+  ctx.fillRect(bx, by, Math.max(0, Math.round(bw * Math.max(0, e.hp / e.maxHp))), bh);
+  // 车厢（链式跟随的棕色车厢）
+  for(const seg of e.segments){
+    const sx = seg.x, sy = seg.y;
+    ctx.fillStyle = "#3a2a1a";
+    ctx.fillRect(sx+2, sy+4, 28, 26);
+    ctx.fillStyle = "#7d5436";
+    ctx.fillRect(sx, sy+2, 32, 30);
+    ctx.fillStyle = "#946a45";
+    ctx.fillRect(sx+3, sy+6, 26, 22);
+    ctx.fillStyle = "#ffd54d";                     // 车窗
+    ctx.fillRect(sx+6, sy+10, 5, 5);
+    ctx.fillRect(sx+21, sy+10, 5, 5);
+    ctx.fillStyle = "#2c2018";                     // 货舱盖
+    ctx.fillRect(sx+8, sy+20, 16, 4);
+    // 车厢血条
+    ctx.fillStyle = "#1a1a22";
+    ctx.fillRect(sx+3, sy+32, 26, 4);
+    ctx.fillStyle = "#e8a33a";
+    ctx.fillRect(sx+3, sy+32, Math.max(0, Math.round(26 * Math.max(0, seg.hp / seg.maxHp))), 4);
+  }
+}
+const BUSH_BLADES = [[4,5],[10,3],[16,7],[22,5],[26,11],[6,15],[13,11],[19,17],[25,21],[5,25],[12,27],[22,29],[9,31],[18,31],[27,27]];
+function drawBush(px, py){
+  ctx.fillStyle = "#1c5023";
+  ctx.fillRect(px, py, CELL, CELL);
+  ctx.fillStyle = "#25632c";
+  ctx.fillRect(px+2, py+2, 28, 28);
+  ctx.fillStyle = "#2e7d32";
+  for(const [bx, by] of BUSH_BLADES){
+    ctx.fillRect(px+bx, py+by, 2, 3);
+  }
+  ctx.fillStyle = "#3f8f3a";
+  for(const [bx, by] of BUSH_BLADES){
+    ctx.fillRect(px+bx, py+by+1, 2, 2);
+  }
+}
+function drawSwamp(px, py){
+  ctx.fillStyle = "#2f3a20";
+  ctx.fillRect(px, py, CELL, CELL);
+  ctx.fillStyle = "#3d4a2a";
+  ctx.fillRect(px+2, py+2, 28, 28);
+  ctx.fillStyle = "#4f5f36";
+  ctx.fillRect(px+5, py+6, 8, 6);
+  ctx.fillRect(px+18, py+14, 9, 7);
+  ctx.fillRect(px+8, py+24, 7, 5);
+  ctx.fillStyle = "#6a7a48";
+  ctx.fillRect(px+8, py+9, 2, 2);
+  ctx.fillRect(px+21, py+17, 2, 2);
+  ctx.fillRect(px+11, py+27, 2, 2);
+}
+function drawWater(px, py){
+  ctx.fillStyle = "#16283f";
+  ctx.fillRect(px, py, CELL, CELL);
+  ctx.fillStyle = "#1e3a5f";
+  ctx.fillRect(px+2, py+2, 28, 28);
+  ctx.fillStyle = "#2a5486";
+  ctx.fillRect(px+4, py+6, 24, 3);
+  ctx.fillRect(px+6, py+16, 20, 3);
+  ctx.fillRect(px+4, py+26, 24, 3);
+  ctx.fillStyle = "#3d76b8";
+  ctx.fillRect(px+6, py+7, 14, 1);
+  ctx.fillRect(px+8, py+17, 12, 1);
+  ctx.fillRect(px+6, py+27, 14, 1);
+}
+function drawIron(px, py, hp){
+  const c1 = hp === 3 ? "#8a939d" : hp === 2 ? "#717a84" : "#5c646d";
+  const c2 = hp === 3 ? "#aeb8c2" : hp === 2 ? "#8f98a2" : "#717a84";
+  ctx.fillStyle = c1;
+  ctx.fillRect(px, py, CELL, CELL);
+  ctx.fillStyle = c2;
+  ctx.fillRect(px+2, py+2, 28, 28);
+  ctx.fillStyle = c1;
+  ctx.fillRect(px+8, py+8, 16, 16);
+  ctx.fillStyle = "#4a5159";
+  ctx.fillRect(px+13, py+13, 6, 6);
+  ctx.fillStyle = "#c4ccd4";
+  ctx.fillRect(px+4, py+4, 4, 4);
+  ctx.fillRect(px+24, py+4, 4, 4);
+  ctx.fillRect(px+4, py+24, 4, 4);
+  ctx.fillRect(px+24, py+24, 4, 4);
+}
+function drawBrick(px, py){
+  ctx.fillStyle = "#a34a22";
+  ctx.fillRect(px, py, CELL, CELL);
+  ctx.fillStyle = "#2a1408";
+  ctx.fillRect(px, py+15, CELL, 2);
+  ctx.fillRect(px+15, py, 2, 16);
+  ctx.fillRect(px+7, py+16, 2, 16);
+  ctx.fillRect(px+23, py+16, 2, 16);
+  ctx.fillStyle = "rgba(255,190,120,.16)";
+  ctx.fillRect(px, py, CELL, 3);
+  ctx.fillStyle = "rgba(0,0,0,.28)";
+  ctx.fillRect(px, py+29, CELL, 3);
+}
+function drawSteel(px, py){
+  ctx.fillStyle = "#8f98a2";
+  ctx.fillRect(px, py, CELL, CELL);
+  ctx.fillStyle = "#b7c0c9";
+  ctx.fillRect(px+2, py+2, 28, 28);
+  ctx.fillStyle = "#8f98a2";
+  ctx.fillRect(px+8, py+8, 16, 16);
+  ctx.fillStyle = "#6f7882";
+  ctx.fillRect(px+13, py+13, 6, 6);
+  ctx.fillStyle = "#c4ccd4";
+  ctx.fillRect(px+4, py+4, 4, 4);
+  ctx.fillRect(px+24, py+4, 4, 4);
+  ctx.fillRect(px+4, py+24, 4, 4);
+  ctx.fillRect(px+24, py+24, 4, 4);
+}
+
+/* ================= 覆盖层 / 暂停 ================= */
+function showOverlay(type){
+  overlay.classList.remove("hidden");
+  ovTitle.classList.remove("red");
+  btnOvRestart.classList.add("hidden");
+  btnOvMenu.classList.add("hidden");
+  if(type === "pause"){
+    ovTitle.textContent = "暂　停";
+    ovSub.textContent = "按 P / Esc 或点击「继续」";
+  } else if(type === "lose"){
+    ovTitle.classList.add("red");
+    ovTitle.textContent = "游 戏 结 束";
+    ovSub.textContent = "大本营被敌方摧毁！";
+    btnOvRestart.classList.remove("hidden");
+    btnOvMenu.classList.remove("hidden");
+  } else if(type === "win"){
+    ovTitle.textContent = "恭 喜 通 关";
+    ovSub.textContent = "已击破全部 Boss，你是坦克英雄！";
+    btnOvRestart.classList.remove("hidden");
+    btnOvMenu.classList.remove("hidden");
+  }
+}
+function hideOverlay(){ overlay.classList.add("hidden"); }
+function togglePause(){
+  if(!game || game.state !== "playing") return;
+  game.paused = !game.paused;
+  document.getElementById("btnPause").textContent = game.paused ? "继续" : "暂停";
+  if(game.paused) showOverlay("pause"); else hideOverlay();
+}
+
+/* ================= HUD ================= */
+function updateHUD(){
+  const g = game;
+  if(!g) return;
+  const p = g.player;
+  document.getElementById("hudStreak").textContent = p.killStreak;
+  const sub = document.getElementById("hudTier");
+  if(p.level > 0){
+    sub.textContent = "Lv." + p.level + " · 再杀 " + Math.max(0, 10 - p.killStreak) + " 升级";
+  } else if(p.killStreak >= 10){
+    sub.textContent = "即将升级！";
+  } else {
+    sub.textContent = "再杀 " + Math.max(0, 10 - p.killStreak) + " 升级";
+  }
+  const lv = document.getElementById("hudLives");
+  if(lv) lv.textContent = LIVES_MAX[settings.lives] === Infinity ? "重生 ∞" : "重生 ×" + Math.max(0, g.livesLeft);
+  const am = document.getElementById("hudAmmo");
+  if(am) am.textContent = ({normal:"普通", apfsds:"穿甲弹", he:"榴弹"})[p.ammo] || "普通";
+  const p2row = document.getElementById("hudP2Row");
+  const p2txt = document.getElementById("hudP2Txt");
+  if(p2row && p2txt){
+    if(g.player2){ p2row.style.display = ""; p2txt.textContent = "连杀 " + g.player2.killStreak + " · Lv." + g.player2.level; }
+    else p2row.style.display = "none";
+  }
+}
+
+/* ================= 主循环启动 ================= */
+function loop(now){
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+  if(game && !game.paused){
+    update(dt);
+    render();
+  } else if(game && game.paused){
+    render();
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ================= 卡牌图标 ================= */
+function drawCardIcon(cv, type){
+  const c = cv.getContext("2d");
+  c.fillStyle = "#0b0b10";
+  c.fillRect(0, 0, 40, 40);
+  if(type === "multi"){
+    c.fillStyle = "#8f98a2";
+    c.fillRect(4, 8, 8, 24); c.fillRect(28, 8, 8, 24);
+    c.fillStyle = "#58b94a";
+    c.fillRect(12, 12, 16, 16);
+    c.fillStyle = "#ffd54d";
+    c.fillRect(18, 4, 4, 10); c.fillRect(22, 6, 4, 8);
+  } else if(type === "barrier"){
+    c.fillStyle = "#3f6ea5";
+    c.fillRect(8, 6, 24, 28);
+    c.fillStyle = "#7fb2e8";
+    c.fillRect(12, 10, 16, 20);
+    c.fillStyle = "#cfe2fa";
+    c.fillRect(16, 14, 8, 12);
+  } else if(type === "fort"){
+    c.fillStyle = "#a34a22";
+    c.fillRect(4, 4, 32, 32);
+    c.fillStyle = "#2a1408";
+    c.fillRect(4, 18, 32, 2); c.fillRect(18, 4, 2, 16);
+    c.fillRect(10, 20, 2, 16); c.fillRect(26, 20, 2, 16);
+    c.fillStyle = "#d97a45";
+    c.fillRect(4, 4, 32, 3);
+  } else if(type === "bomb"){
+    c.fillStyle = "#8f1f1f";
+    c.fillRect(10, 10, 20, 20);
+    c.fillStyle = "#e84545";
+    c.fillRect(14, 14, 12, 12);
+    c.fillStyle = "#ffd54d";
+    c.fillRect(24, 6, 4, 4);
+    c.fillStyle = "#5c646d";
+    c.fillRect(20, 8, 8, 3);
+  } else if(type === "apfsds"){
+    // 尾翼稳定脱壳穿甲弹：细长钨合金杆 + 尖锥弹头 + 四片尾翼（蓝色飞镖造型）
+    c.fillStyle = "#5c8aa8";
+    c.fillRect(5, 12, 3, 4); c.fillRect(5, 22, 3, 4);    // 尾翼（上下各一对外鳍）
+    c.fillRect(9, 11, 3, 4); c.fillRect(9, 23, 3, 4);
+    c.fillRect(13, 13, 3, 3); c.fillRect(13, 22, 3, 3);
+    c.fillStyle = "#8fd4ff";
+    c.fillRect(5, 17, 29, 4);                            // 细长杆身
+    c.fillStyle = "#dff3ff";
+    c.fillRect(5, 17, 29, 2);                            // 杆身高光
+    c.fillStyle = "#bfe8ff";
+    c.beginPath(); c.moveTo(33, 13); c.lineTo(40, 18); c.lineTo(33, 25); c.fill();  // 尖锥弹头
+    c.fillStyle = "#5c8aa8";
+    c.fillRect(20, 14, 2, 10);                           // 弹托环
+    c.fillStyle = "#dff3ff";
+    c.fillRect(3, 18, 3, 2);                             // 尾端高光
+  } else if(type === "he"){
+    // 榴弹：橙黄色现实炮弹（引信 + 尖锥弹头 + 圆柱弹体 + 弹带）
+    c.fillStyle = "#c96f1f";
+    c.fillRect(15, 4, 3, 3);                             // 引信座
+    c.fillStyle = "#ffd54d";
+    c.fillRect(15, 3, 3, 3);                             // 引信尖
+    c.fillStyle = "#ffb347";
+    c.beginPath(); c.moveTo(10, 9); c.lineTo(21, 9); c.lineTo(24, 15); c.lineTo(7, 15); c.fill();  // 尖锥弹头
+    c.fillStyle = "#f0a030";
+    c.fillRect(7, 15, 16, 13);                           // 圆柱弹体
+    c.fillStyle = "#ffc86b";
+    c.fillRect(10, 17, 9, 9);                            // 弹体高光
+    c.fillStyle = "#8a5a17";
+    c.fillRect(7, 27, 16, 3);                            // 弹带
+    c.fillRect(10, 30, 10, 3);                           // 底部
+  } else if(type === "drone"){
+    c.fillStyle = "#2c3038";
+    c.fillRect(16, 16, 10, 8);
+    c.fillStyle = "#8f98a2";
+    c.fillRect(10, 9, 5, 5); c.fillRect(27, 9, 5, 5);
+    c.fillRect(10, 28, 5, 5); c.fillRect(27, 28, 5, 5);
+    c.fillStyle = "#c4ccd4";
+    c.fillRect(8, 10, 8, 2); c.fillRect(25, 10, 8, 2);
+    c.fillRect(8, 28, 8, 2); c.fillRect(25, 28, 8, 2);
+    c.fillStyle = "#ffd54d";                                  // 星级：最多 3 颗
+    c.fillRect(4, 3, 5, 5); c.fillRect(11, 3, 5, 5); c.fillRect(18, 3, 5, 5);
+  }
+}
+
+/* ================= 界面绑定 ================= */
+const newGameOverlay = document.getElementById("newGameOverlay");
+/* 轻量提示 */
+let toastEl = null, toastTimer = null;
+function showToast(msg){
+  if(!toastEl){
+    toastEl = document.createElement("div");
+    toastEl.style.cssText = "position:fixed;left:50%;top:14%;transform:translateX(-50%);z-index:99;"
+      + "background:#17171f;border:2px solid #ffc93c;color:#e8e6dd;padding:12px 22px;"
+      + "font-family:inherit;font-size:15px;letter-spacing:2px;box-shadow:0 4px 0 #000;display:none;";
+    document.body.appendChild(toastEl);
+  }
+  toastEl.textContent = msg;
+  toastEl.style.display = "block";
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { if(toastEl) toastEl.style.display = "none"; }, 1800);
+}
+
+document.getElementById("btnStart").addEventListener("click", openNewGame);
+document.getElementById("btnBoss").addEventListener("click", openBossSelect);
+document.getElementById("btnBossCancel").addEventListener("click", () => {
+  bossOverlay.classList.add("hidden");
+  refreshTitleButtons();
+});
+document.getElementById("btnContinue").addEventListener("click", continueGame);
+document.getElementById("btnSettings").addEventListener("click", () => {
+  SND.init(); SND.resume();
+  refreshSettingsUI();
+  showScreen("settings");
+  SND.bgmStart("menu");
+});
+document.getElementById("btnSaveBack").addEventListener("click", () => {
+  showScreen("title");
+  refreshTitleButtons();
+});
+document.getElementById("btnPause").addEventListener("click", togglePause);
+document.getElementById("btnQuit").addEventListener("click", quitToMenu);
+function restartFromOverlay(){
+  // Boss 战结束后重开：回到当前 Boss 的增益卡牌选择，而非普通新游戏
+  if(game && game.bossMode && game.bossIdOverride){
+    const lv = game.level || 1;
+    const bid = game.bossIdOverride;
+    hideOverlay();
+    openBossPick(lv, bid);
+    return;
+  }
+  newGame();
+}
+document.getElementById("btnOvRestart").addEventListener("click", restartFromOverlay);
+document.getElementById("btnOvMenu").addEventListener("click", quitToMenu);
+
+/* ---- 新游戏配置 ---- */
+const ngDiffBtns = document.querySelectorAll("#ngDifficulty .opt-btn");
+const ngTankBtns = document.querySelectorAll("#ngTank .opt-btn");
+const ngTank2Btns = document.querySelectorAll("#ngTank2 .opt-btn");
+const ngLivesBtns = document.querySelectorAll("#ngLives .opt-btn");
+const ngNightBtns = document.querySelectorAll("#ngNight .opt-btn");
+const ngModeBtns = document.querySelectorAll("#ngMode .opt-btn");
+function openNewGame(){
+  SND.init(); SND.resume();
+  refreshNgUI();
+  newGameOverlay.classList.remove("hidden");
+}
+function refreshNgUI(){
+  ngDiffBtns.forEach(b => b.classList.toggle("on", b.dataset.diff === settings.difficulty));
+  ngTankBtns.forEach(b => b.classList.toggle("on", b.dataset.tank === settings.tankType));
+  ngTank2Btns.forEach(b => b.classList.toggle("on", b.dataset.tank === (settings.tankType2 || settings.tankType)));
+  ngLivesBtns.forEach(b => b.classList.toggle("on", b.dataset.lives === settings.lives));
+  ngNightBtns.forEach(b => b.classList.toggle("on", (b.dataset.night === "on") === settings.night));
+  ngModeBtns.forEach(b => b.classList.toggle("on", b.dataset.mode === settings.mode));
+  // P2 坦克组仅双人模式显示
+  const g2 = document.getElementById("ngTank2Group");
+  if(g2) g2.style.display = settings.mode === "duo" ? "" : "none";
+  document.getElementById("ngTankDesc").innerHTML = TANK_DESCS[settings.tankType];
+  drawTankPreviewTo(document.getElementById("ngTankPreview"));
+  document.getElementById("ngTankDesc2").innerHTML = TANK_DESCS[settings.tankType2 || settings.tankType];
+  drawTankPreviewTo(document.getElementById("ngTankPreview2"), settings.tankType2 || settings.tankType);
+}
+ngDiffBtns.forEach(b => b.addEventListener("click", () => {
+  settings.difficulty = b.dataset.diff;
+  saveSettings();
+  refreshNgUI();
+}));
+ngTankBtns.forEach(b => b.addEventListener("click", () => {
+  settings.tankType = b.dataset.tank;
+  saveSettings();
+  refreshNgUI();
+}));
+ngTank2Btns.forEach(b => b.addEventListener("click", () => {
+  settings.tankType2 = b.dataset.tank;
+  saveSettings();
+  refreshNgUI();
+}));
+ngLivesBtns.forEach(b => b.addEventListener("click", () => {
+  settings.lives = b.dataset.lives;
+  saveSettings();
+  refreshNgUI();
+}));
+ngNightBtns.forEach(b => b.addEventListener("click", () => {
+  settings.night = b.dataset.night === "on";
+  saveSettings();
+  refreshNgUI();
+}));
+ngModeBtns.forEach(b => b.addEventListener("click", () => {
+  settings.mode = b.dataset.mode;
+  saveSettings();
+  refreshNgUI();
+}));
+document.getElementById("btnNgStart").addEventListener("click", () => {
+  newGameOverlay.classList.add("hidden");
+  newGame();
+});
+document.getElementById("btnNgCancel").addEventListener("click", () => {
+  newGameOverlay.classList.add("hidden");
+  refreshTitleButtons();
+});
+
+/* ---- 音量 / 振动 ---- */
+document.getElementById("sfxVol").addEventListener("input", e => {
+  SND.setSfxVol(parseInt(e.target.value, 10) || 0);
+  refreshSettingsUI();
+});
+document.getElementById("bgmVol").addEventListener("input", e => {
+  SND.setBgmVol(parseInt(e.target.value, 10) || 0);
+  refreshSettingsUI();
+});
+document.getElementById("vibBtn").addEventListener("click", () => {
+  settings.vibrate = !settings.vibrate;
+  saveSettings();
+  refreshSettingsUI();
+});
+
+/* ---- 按键 ---- */
+const keyBtns = document.querySelectorAll(".kbtn");
+const TANK_DESCS = {
+  light: "移速 <b>3 格/秒</b>，速度最快；<b>无装甲</b>，任意方向被击中即击毁。<br>技能【引擎过载】：5 秒内移速提升至 4 格/秒、开火间隔降至 0.33 秒，冷却 15 秒。",
+  medium: "移速 <b>2.5 格/秒</b>；<b>正面</b>挡 2 发（第 3 发击毁），<b>侧后</b>1 发击毁。<br>技能【阳电子炮】：发射贯穿前方整行/列的激光，摧毁途经障碍与敌人，冷却 20 秒。",
+  heavy: "移速 <b>2 格/秒</b>，装甲最厚；<b>正面</b>挡 3 发（第 4 发击毁），<b>侧后</b>挡 2 发（第 3 发击毁）。<br>技能【冲撞碾压】：8 秒内移速提升至 3 格/秒，碾碎路径上的砖块与敌人，冷却 15 秒。"
+};
+function refreshKeyButtons(){
+  keyBtns.forEach(b => {
+    const t = keyTarget(b.dataset.key);
+    b.textContent = keyLabel(t.set[t.name]);
+    b.classList.toggle("listening", rebinding === b.dataset.key);
+  });
+}
+function drawTankPreviewTo(pc, tankType){
+  const pctx = pc.getContext("2d");
+  const t = tankType || settings.tankType;
+  pctx.fillStyle = "#0b0b10";
+  pctx.fillRect(0, 0, 96, 96);
+  pctx.strokeStyle = "rgba(255,255,255,.07)";
+  pctx.strokeRect(0.5, 0.5, 95, 95);
+  drawSprite(pctx, spriteFor(PLAYER_SPRITE_KEY[t], 0), 32, 32, 2, TANK_PALS[t]);
+}
+function refreshSettingsUI(){
+  document.getElementById("sfxVol").value = settings.sfxVol;
+  document.getElementById("sfxVolVal").textContent = settings.sfxVol;
+  document.getElementById("bgmVol").value = settings.bgmVol;
+  document.getElementById("bgmVolVal").textContent = settings.bgmVol;
+  const vb = document.getElementById("vibBtn");
+  vb.textContent = settings.vibrate ? "振动：开" : "振动：关";
+  vb.classList.toggle("toggle-on", settings.vibrate);
+  refreshKeyButtons();
+}
+keyBtns.forEach(b => b.addEventListener("click", () => {
+  rebinding = b.dataset.key;
+  refreshKeyButtons();
+}));
+refreshSettingsUI();
+refreshTitleButtons();
+</script>
+</body>
+</html>
